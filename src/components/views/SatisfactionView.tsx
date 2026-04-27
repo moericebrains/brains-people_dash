@@ -5,6 +5,69 @@ import { FLOWERS, TEAM_COLORS, PETAL_COLORS } from "@/lib/constants";
 import type { FlowerRecipient, PulseApiData, OnaApiData } from "@/lib/types";
 import MiniBar from "@/components/ui/MiniBar";
 
+// ── Celebration word cloud ─────────────────────────────────────────────────────
+
+const CLOUD_COLORS = ["#EA5B32", "#2E7354", "#3565E3", "#EDC157", "#EEB1D2", "#C0DFEC", "#7A5CCC", "#E07B39"];
+
+function CelebrationCloud({ celebrations }: { celebrations: string[] }) {
+  const [selected, setSelected] = useState<string | null>(null);
+
+  const counts: Record<string, { display: string; count: number }> = {};
+  celebrations.forEach((c) => {
+    const key = c.trim().toLowerCase();
+    if (!counts[key]) counts[key] = { display: c.trim(), count: 0 };
+    counts[key].count++;
+  });
+
+  const phrases = Object.entries(counts)
+    .sort((a, b) => b[1].count - a[1].count);
+
+  const maxCount = Math.max(1, ...phrases.map(([, v]) => v.count));
+
+  const selectedPhrase = selected ? counts[selected] : null;
+
+  return (
+    <div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", lineHeight: 2.2 }}>
+        {phrases.map(([key, { display, count }], i) => {
+          const size = 13 + Math.round((count / maxCount) * 13);
+          const color = CLOUD_COLORS[i % CLOUD_COLORS.length];
+          const isSelected = selected === key;
+          return (
+            <span
+              key={key}
+              onClick={() => setSelected(isSelected ? null : key)}
+              style={{
+                fontSize: size,
+                fontWeight: count > 1 ? 800 : 500,
+                color: isSelected ? "#fff" : color,
+                background: isSelected ? color : `${color}18`,
+                border: `1.5px solid ${color}`,
+                borderRadius: 6,
+                padding: "3px 12px",
+                cursor: "pointer",
+                transition: "all 0.15s",
+                userSelect: "none",
+                letterSpacing: "-0.01em",
+              }}
+            >
+              {display}
+            </span>
+          );
+        })}
+      </div>
+      {selectedPhrase && (
+        <div style={{ marginTop: 16, padding: "12px 16px", background: "#F7F7F5", borderLeft: "3px solid #EA5B32", display: "flex", alignItems: "baseline", gap: 6 }}>
+          <span style={{ fontSize: 28, fontWeight: 900, color: "#131313", lineHeight: 1 }}>{selectedPhrase.count}</span>
+          <span style={{ fontSize: 14, color: "#555" }}>
+            {selectedPhrase.count === 1 ? "teammate is" : "teammates are"} proud of <strong>{selectedPhrase.display}</strong> this cycle
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Animated SVG flower ────────────────────────────────────────────────────────
 
 interface FlowerSVGProps {
@@ -162,8 +225,10 @@ export default function SatisfactionView({ pulseData, onaData, flowers }: Satisf
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
             <span style={{ fontSize: 44, fontWeight: 900, color: "#131313", lineHeight: 1 }}>{avgGptw}</span>
             <span style={{ fontSize: 18, color: "#7A7A7A" }}>/5</span>
+            <span style={{ fontSize: 28, fontWeight: 900, color: "#2E7354", marginLeft: 8 }}>{gptw4plusPct}%</span>
           </div>
-          <div style={{ fontSize: 14, color: "#2E7354", fontWeight: 700, marginBottom: 20 }}>{gptw4plusPct}% rated 4 or 5 stars</div>
+          <div style={{ fontSize: 14, color: "#2E7354", fontWeight: 700, marginBottom: 4 }}>rated 4 or 5 stars</div>
+          <div style={{ fontSize: 11, color: "#BBBBB5", marginBottom: 20 }}>Avg. American company scores 57% — you&apos;re {gptw4plusPct > 57 ? `${gptw4plusPct - 57}pts above` : gptw4plusPct === 57 ? "right at" : `${57 - gptw4plusPct}pts below`} the national benchmark</div>
           {gptwBars.map((b) => (
             <div key={b.stars} style={{ marginBottom: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
@@ -197,15 +262,9 @@ export default function SatisfactionView({ pulseData, onaData, flowers }: Satisf
       {/* ── Section 2: What the Team is Celebrating ── */}
       <div style={{ background: "#FFFFFF", padding: "20px", marginBottom: 8, boxShadow: "0 2px 12px rgba(0,0,0,0.35)" }}>
         <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>WHAT THE TEAM IS CELEBRATING</div>
-        <div style={{ fontSize: 14, color: "#BBBBB5", marginBottom: 20 }}>n={responseCount} respondents</div>
+        <div style={{ fontSize: 14, color: "#BBBBB5", marginBottom: 20 }}>n={responseCount} respondents · click a phrase to see how many teammates share it</div>
         {liveCelebrations.length > 0 ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8 }}>
-            {liveCelebrations.map((text, i) => (
-              <div key={i} style={{ background: "#F7F7F5", padding: "14px 16px", borderLeft: "3px solid #2E7354" }}>
-                <div style={{ fontSize: 14, color: "#333", lineHeight: 1.5 }}>&ldquo;{text}&rdquo;</div>
-              </div>
-            ))}
-          </div>
+          <CelebrationCloud celebrations={liveCelebrations} />
         ) : (
           <div style={{ color: "#BBBBB5", fontSize: 14 }}>No celebration responses this cycle.</div>
         )}

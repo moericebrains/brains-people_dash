@@ -170,7 +170,7 @@ export default function Dashboard() {
 
       {/* Content */}
       <main style={{ padding: "16px 16px 0" }}>
-        {view === "pulse"        && <PulseView pulseData={pulseApi} />}
+        {view === "pulse"        && <PulseView pulseData={pulseApi} role={role} />}
         {view === "satisfaction" && <SatisfactionView pulseData={pulseApi} onaData={onaApi} flowers={liveFlowers.length ? liveFlowers : undefined} />}
         {view === "stress"       && <StressView onaNodes={onaNodes} onaAlerts={onaAlerts} />}
         {view === "actions"      && <ActionsView role={role} onSelectPerson={setSelectedPerson} />}

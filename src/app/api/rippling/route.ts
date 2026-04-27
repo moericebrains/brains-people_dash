@@ -74,6 +74,10 @@ export async function GET() {
     // celebrations (raw text for now)
     const celebrations = pulseData.map((r) => r[9]).filter(Boolean);
 
+    // open text: stressors + support needs
+    const stressors = pulseData.map((r) => r[6]).filter(Boolean);
+    const supportNeeds = pulseData.map((r) => r[10]).filter(Boolean);
+
     // by-team feeling
     const byTeam: Record<string, number[]> = {};
     pulseData.forEach((r) => {
@@ -130,6 +134,8 @@ export async function GET() {
         gptwDist,
         flowerCounts,
         celebrations,
+        stressors,
+        supportNeeds,
         byTeam: Object.fromEntries(
           Object.entries(byTeam).map(([team, scores]) => [team, avg(scores)])
         ),

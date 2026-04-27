@@ -68,6 +68,8 @@ export interface PulseApiData {
   gptwDist: Record<string, number>;
   flowerCounts: Record<string, number>;
   celebrations: string[];
+  stressors: string[];
+  supportNeeds: string[];
   byTeam: Record<string, number>;
   responseCount: number;
 }

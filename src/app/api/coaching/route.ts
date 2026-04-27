@@ -20,37 +20,51 @@ const ACTION_INSTRUCTIONS = `You are a coaching intelligence tool for Brains.
 Write a SHORT (3-4 sentences), direct, human coaching narrative. Sound like a thoughtful Brains leader.
 No bullet points. No preamble.`;
 
+const THEMES_INSTRUCTIONS = `You are analyzing open-text survey responses from a creative agency team.
+Extract the top 5 themes. Return ONLY valid JSON — an array of objects with keys "theme" (short label, max 4 words), "count" (estimated number of responses touching this theme), and "insight" (one sharp sentence about what this signals). No markdown, no explanation, just the JSON array.`;
+
+const FRAMEWORK_INSTRUCTIONS = `You are a senior leadership coach at Brains, an independent creative agency and B-Corp.
+Based on the stress signals and support needs from the team's pulse survey, write a concise leadership framework — practical actions for this cycle grounded in Brains' markers of excellence and values.
+Format: 3-4 named action areas, each with a 1-sentence directive. Sound like a thoughtful, warm Brains leader. No fluff. No generic advice.`;
+
 export async function POST(req: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY not set" }, { status: 503 });
   }
 
   const { type, prompt, personContext } = await req.json() as {
-    type: "person" | "action";
+    type: "person" | "action" | "themes" | "framework";
     prompt: string;
     personContext?: string;
   };
 
-  const instructions = type === "person" ? PERSON_INSTRUCTIONS : ACTION_INSTRUCTIONS;
+  let instructions = ACTION_INSTRUCTIONS;
+  if (type === "person") instructions = PERSON_INSTRUCTIONS;
+  if (type === "themes") instructions = THEMES_INSTRUCTIONS;
+  if (type === "framework") instructions = FRAMEWORK_INSTRUCTIONS;
+
   const actionSuffix = personContext ? `\n\nWhere relevant, weave in this person's profile: ${personContext}` : "";
 
   const message = await client.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 600,
+    max_tokens: type === "themes" ? 400 : type === "framework" ? 800 : 600,
     system: [
-      {
-        type: "text",
-        text: BRAINS_CONTEXT,
-        cache_control: { type: "ephemeral" },
-      },
-      {
-        type: "text",
-        text: instructions + actionSuffix,
-      },
+      { type: "text", text: BRAINS_CONTEXT, cache_control: { type: "ephemeral" } },
+      { type: "text", text: instructions + (type === "person" ? actionSuffix : "") },
     ],
     messages: [{ role: "user", content: prompt }],
   });
 
   const text = message.content.find((b) => b.type === "text")?.text ?? "";
+
+  if (type === "themes") {
+    try {
+      const themes = JSON.parse(text);
+      return NextResponse.json({ themes });
+    } catch {
+      return NextResponse.json({ themes: [] });
+    }
+  }
+
   return NextResponse.json({ text });
 }
