@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -H \"Authorization: Bearer bt_QIDrUFnC1MkKJJN7VaGTbOYg--Q_L549\" https://wiki.brains.co/api/llm-context)"
+    ]
+  }
+}

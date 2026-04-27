@@ -1,0 +1,25 @@
+# deps
+/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# next
+/.next/
+/out/
+
+# env
+.env*.local
+
+# misc
+.DS_Store
+*.pem
+/coverage
+/.nyc_output
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts

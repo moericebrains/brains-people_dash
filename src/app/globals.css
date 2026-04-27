@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar { width: 4px; background: #111; }
+::-webkit-scrollbar-thumb { background: #BBBBB5; }
+
+button { font-family: 'DM Sans', sans-serif; }
+input  { font-family: 'DM Sans', sans-serif; }
+
+/* ── Flower animations ──────────────────────────────────────── */
+
+@keyframes flowerSway {
+  0%, 100% { transform: rotate(-2.5deg); }
+  50%       { transform: rotate(2.5deg); }
+}
+
+.flower-sway {
+  animation: flowerSway 4s ease-in-out infinite;
+  transform-origin: 50% 100%;
+  display: inline-block;
+}
