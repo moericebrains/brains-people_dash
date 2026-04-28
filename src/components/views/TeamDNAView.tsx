@@ -16,6 +16,25 @@ const initials = (name: string) => {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
 };
 
+const ALLOWED_PODS = ["Pod 1", "Pod 2", "Brand Pod", "Admin", "Web Pod", "Production", "Creative", "Accounts", "Strategy", "Projects"];
+const POD_CANONICAL: Record<string, string> = {
+  "pod 1": "Pod 1", "pod1": "Pod 1",
+  "pod 2": "Pod 2", "pod2": "Pod 2",
+  "brand pod": "Brand Pod", "brand": "Brand Pod",
+  "admin": "Admin", "administration": "Admin",
+  "web pod": "Web Pod", "web": "Web Pod",
+  "production": "Production", "prod": "Production",
+  "creative": "Creative",
+  "accounts": "Accounts", "account": "Accounts",
+  "strategy": "Strategy",
+  "projects": "Projects", "project management": "Projects", "pm": "Projects",
+};
+function personPods(raw: string): string[] {
+  return raw.split(",")
+    .map((s) => POD_CANONICAL[s.trim().toLowerCase()] ?? "")
+    .filter((s) => ALLOWED_PODS.includes(s));
+}
+
 function strengthSimilarity(a: Person, b: Person): number {
   return a.strengths.filter((s) => b.strengths.includes(s)).length;
 }
@@ -204,7 +223,8 @@ export default function TeamDNAView({ onSelectPerson, people = PEOPLE }: TeamDNA
   const [openEnn, setOpenEnn] = useState<string | null>(null);
   const [openMbti, setOpenMbti] = useState<string | null>(null);
 
-  const PODS = [...new Set(people.map((p) => p.pod).filter(Boolean))];
+  const allPersonPods = people.flatMap((p) => p.pod ? personPods(p.pod) : []);
+  const PODS = ALLOWED_PODS.filter((pod) => allPersonPods.includes(pod));
   const THEMES = [...new Set(people.map((p) => p.theme).filter(Boolean))];
   const lensOptions = [
     { id: "org", label: "FULL ORG" },
@@ -213,7 +233,7 @@ export default function TeamDNAView({ onSelectPerson, people = PEOPLE }: TeamDNA
   ];
 
   const filtered = lens === "org" ? people
-    : lens.startsWith("pod:") ? people.filter((p) => p.pod === lens.slice(4))
+    : lens.startsWith("pod:") ? people.filter((p) => p.pod ? personPods(p.pod).includes(lens.slice(4)) : false)
     : people.filter((p) => p.theme === lens.slice(6));
 
   const domainCounts = getDomainCounts(filtered);

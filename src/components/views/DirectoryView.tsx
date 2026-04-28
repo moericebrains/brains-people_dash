@@ -16,6 +16,25 @@ const initials = (name: string) => {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
 };
 
+const ALLOWED_PODS = ["Pod 1", "Pod 2", "Brand Pod", "Admin", "Web Pod", "Production", "Creative", "Accounts", "Strategy", "Projects"];
+const POD_CANONICAL: Record<string, string> = {
+  "pod 1": "Pod 1", "pod1": "Pod 1",
+  "pod 2": "Pod 2", "pod2": "Pod 2",
+  "brand pod": "Brand Pod", "brand": "Brand Pod",
+  "admin": "Admin", "administration": "Admin",
+  "web pod": "Web Pod", "web": "Web Pod",
+  "production": "Production", "prod": "Production",
+  "creative": "Creative",
+  "accounts": "Accounts", "account": "Accounts",
+  "strategy": "Strategy",
+  "projects": "Projects", "project management": "Projects", "pm": "Projects",
+};
+function personPods(raw: string): string[] {
+  return raw.split(",")
+    .map((s) => POD_CANONICAL[s.trim().toLowerCase()] ?? "")
+    .filter((s) => ALLOWED_PODS.includes(s));
+}
+
 const AVATAR_COLORS = [
   "var(--bof-green)", "var(--bof-blue)", "var(--bof-orange)",
   "var(--bof-yellow)", "var(--bof-pink)",
@@ -36,14 +55,17 @@ export default function DirectoryView({ onSelectPerson, people = PEOPLE }: Direc
   const [filterMissing, setFilterMissing] = useState(false);
 
   // Collect unique pods + locations
-  const pods = useMemo(() => [...new Set(people.map((p) => p.pod))].sort(), [people]);
+  const pods = useMemo(() => {
+    const all = people.flatMap((p) => p.pod ? personPods(p.pod) : []);
+    return ALLOWED_PODS.filter((pod) => all.includes(pod));
+  }, [people]);
   const locations = useMemo(() => [...new Set(people.map((p) => p.location))].sort(), [people]);
   const missingCount = people.filter((p) => !p.mbti && !p.enneagram && !p.strengths?.length).length;
 
   const visible = people.filter((p) => {
     const q = search.toLowerCase();
     const matchesSearch = !q || p.name.toLowerCase().includes(q) || p.role.toLowerCase().includes(q) || p.pod.toLowerCase().includes(q);
-    const matchesPod = !filterPod || p.pod === filterPod;
+    const matchesPod = !filterPod || (p.pod ? personPods(p.pod).includes(filterPod) : false);
     const matchesLoc = !filterLoc || p.location === filterLoc;
     const matchesMissing = !filterMissing || (!p.mbti && !p.enneagram && !p.strengths?.length);
     return matchesSearch && matchesPod && matchesLoc && matchesMissing;

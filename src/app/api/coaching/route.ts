@@ -47,12 +47,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const message = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-sonnet-4-5",
       max_tokens: type === "themes" ? 400 : type === "framework" ? 800 : 600,
-      system: [
-        { type: "text", text: BRAINS_CONTEXT, cache_control: { type: "ephemeral" } },
-        { type: "text", text: instructions + (type === "person" ? actionSuffix : "") },
-      ],
+      system: BRAINS_CONTEXT + "\n\n" + instructions + (type === "person" ? actionSuffix : ""),
       messages: [{ role: "user", content: prompt }],
     });
 
