@@ -47,15 +47,11 @@ export default function Dashboard() {
   const [onaApi, setOnaApi] = useState<OnaApiData | null>(null);
   const [harvestApi, setHarvestApi] = useState<HarvestData | null>(null);
   const [harvestRange, setHarvestRange] = useState<"current" | "3m" | "6m">("current");
-  const [cycleFrom, setCycleFrom] = useState("");
-  const [cycleTo, setCycleTo] = useState("");
+  const [cycleMonth, setCycleMonth] = useState("");
   const [people, setPeople] = useState<Person[]>(PEOPLE);
 
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (cycleFrom) params.set("from", cycleFrom);
-    if (cycleTo)   params.set("to",   cycleTo);
-    const qs = params.toString() ? `?${params.toString()}` : "";
+    const qs = cycleMonth ? `?month=${cycleMonth}` : "";
     fetch(`/api/rippling${qs}`)
       .then((r) => r.json())
       .then((d: { pulse: PulseApiData; ona: OnaApiData }) => {
@@ -83,7 +79,7 @@ export default function Dashboard() {
     };
     window.addEventListener("peopledash:selectperson", handleSelectPerson);
     return () => window.removeEventListener("peopledash:selectperson", handleSelectPerson);
-  }, [harvestRange, cycleFrom, cycleTo]);
+  }, [harvestRange, cycleMonth]);
 
   // Derive FLOWERS list from live pulse flowerCounts, fall back to PULSE_DATA mock
   const flowerCounts = pulseApi?.flowerCounts ?? {};
@@ -140,8 +136,8 @@ export default function Dashboard() {
 
         <div style={{ width: "100%", maxWidth: 420, position: "relative", zIndex: 1 }}>
           {/* Decorative tilted bars */}
-          <span style={{ position: "absolute", width: 64, height: 16, background: "rgba(184,164,242,0.65)", transform: "rotate(-4deg)", top: -8, left: 28, borderRadius: 2, boxShadow: "0 2px 6px rgba(19,19,19,0.06)" }} />
-          <span style={{ position: "absolute", width: 64, height: 16, background: "rgba(237,193,87,0.75)", transform: "rotate(5deg)", top: -8, right: 24, borderRadius: 2, boxShadow: "0 2px 6px rgba(19,19,19,0.06)" }} />
+          <span style={{ position: "absolute", width: 64, height: 16, background: "rgba(234,91,50,0.70)", transform: "rotate(-4deg)", top: -8, left: 28, borderRadius: 2, boxShadow: "0 2px 6px rgba(19,19,19,0.06)" }} />
+          <span style={{ position: "absolute", width: 64, height: 16, background: "rgba(46,115,84,0.70)", transform: "rotate(5deg)", top: -8, right: 24, borderRadius: 2, boxShadow: "0 2px 6px rgba(19,19,19,0.06)" }} />
 
           <div style={{
             background: "#FFFFFF",
@@ -314,26 +310,22 @@ export default function Dashboard() {
         ))}
       </nav>
 
-      {/* Meta bar — cycle date picker */}
+      {/* Meta bar — month selector */}
       <div style={{ padding: "8px 24px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(245,245,245,.40)" }}>Cycle</span>
-          <input
-            type="date"
-            value={cycleFrom || pulseApi?.cycleBounds?.from || ""}
-            onChange={(e) => setCycleFrom(e.target.value)}
-            style={{ background: "rgba(245,245,245,.08)", border: "1px solid rgba(245,245,245,.15)", color: "#F5F5F5", fontFamily: "var(--font-body)", fontSize: 11, padding: "4px 8px", borderRadius: 3, outline: "none", colorScheme: "dark" }}
-          />
-          <span style={{ color: "rgba(245,245,245,.30)", fontSize: 11 }}>→</span>
-          <input
-            type="date"
-            value={cycleTo || pulseApi?.cycleBounds?.to || ""}
-            onChange={(e) => setCycleTo(e.target.value)}
-            style={{ background: "rgba(245,245,245,.08)", border: "1px solid rgba(245,245,245,.15)", color: "#F5F5F5", fontFamily: "var(--font-body)", fontSize: 11, padding: "4px 8px", borderRadius: 3, outline: "none", colorScheme: "dark" }}
-          />
-          {(cycleFrom || cycleTo) && (
-            <button onClick={() => { setCycleFrom(""); setCycleTo(""); }} style={{ background: "transparent", border: "none", color: "rgba(245,245,245,.35)", fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", cursor: "pointer", padding: "4px 6px" }}>Reset</button>
-          )}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(245,245,245,.35)", marginRight: 4 }}>Cycle</span>
+          {(pulseApi?.availableMonths ?? []).map((m) => {
+            const isActive = (cycleMonth || pulseApi?.activeMonth) === m.key;
+            return (
+              <button key={m.key} onClick={() => setCycleMonth(m.key)} style={{
+                fontFamily: "var(--font-body)", fontWeight: 700, fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase",
+                padding: "4px 9px", borderRadius: 3, cursor: "pointer", border: "none",
+                background: isActive ? "rgba(245,245,245,.18)" : "rgba(245,245,245,.06)",
+                color: isActive ? "#F5F5F5" : "rgba(245,245,245,.40)",
+                transition: "all .15s",
+              }}>{m.short}</button>
+            );
+          })}
         </div>
         <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(245,245,245,.35)" }}>
           {pulseApi ? `${pulseApi.responseCount} of ${pulseApi.teamSize ?? 27} responded` : "— of 27 responded"}

@@ -28,17 +28,22 @@ function avg(nums: number[]): number {
   return Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10;
 }
 
-function toISODate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+function monthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function prevMonthKey(key: string): string {
+  const [y, m] = key.split("-").map(Number);
+  const d = new Date(y, m - 2, 1); // m-1 is current month (0-based), m-2 is prev
+  return monthKey(d);
 }
 
 export async function GET(req: NextRequest) {
-  const fromParam = req.nextUrl.searchParams.get("from"); // YYYY-MM-DD
-  const toParam   = req.nextUrl.searchParams.get("to");   // YYYY-MM-DD
+  const monthParam = req.nextUrl.searchParams.get("month"); // YYYY-MM, e.g. "2026-04"
 
-  const key = process.env.GOOGLE_SHEETS_API_KEY;
+  const key     = process.env.GOOGLE_SHEETS_API_KEY;
   const pulseId = process.env.GOOGLE_PULSE_SHEET_ID;
-  const onaId = process.env.GOOGLE_ONA_SHEET_ID;
+  const onaId   = process.env.GOOGLE_ONA_SHEET_ID;
 
   if (!key || !pulseId || !onaId) {
     return NextResponse.json({ source: "mock", pulse: PULSE_DATA, ona: ONA_DATA });
@@ -53,119 +58,103 @@ export async function GET(req: NextRequest) {
     // ── Pulse aggregation ────────────────────────────────────────────────────
     const allPulseData = pulseRows.slice(1).filter((r) => r[4]); // skip header, skip empty
 
-    // Determine cycle date bounds
-    const now = new Date();
-    let cycleFrom: Date, cycleTo: Date;
-
-    if (fromParam && toParam) {
-      // Manual override from date picker
-      cycleFrom = new Date(fromParam + "T00:00:00");
-      cycleTo   = new Date(toParam   + "T23:59:59");
-    } else {
-      // Auto-detect: survey goes out on the 20th
-      // On/after the 20th → current month; before the 20th → previous month
-      cycleFrom = new Date(now.getFullYear(), now.getDate() >= 20 ? now.getMonth() : now.getMonth() - 1, 20);
-      cycleTo   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-    }
-
-    const cycleLabel = cycleFrom.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-
-    // Filter to cycle range
-    const cycleRows = allPulseData.filter((r) => {
-      const d = new Date(r[2]);
-      return !isNaN(d.getTime()) && d >= cycleFrom && d <= cycleTo;
-    });
-
-    // Fall back to all data if no responses in range
-    const cycleData = cycleRows.length > 0 ? cycleRows : allPulseData;
-
-    // Apples-to-apples prev period: same day range, 1 month prior
-    const prevFrom = new Date(cycleFrom);
-    prevFrom.setMonth(prevFrom.getMonth() - 1);
-    const prevTo = new Date(cycleTo);
-    prevTo.setMonth(prevTo.getMonth() - 1);
-
-    const prevPeriodData = allPulseData.filter((r) => {
-      const d = new Date(r[2]);
-      return !isNaN(d.getTime()) && d >= prevFrom && d <= prevTo;
-    });
-
-    const prevCycle = prevPeriodData.length > 0 ? {
-      feeling:     avg(prevPeriodData.map((r) => parseFloat(r[4])).filter((n) => !isNaN(n))),
-      stressSource: avg(prevPeriodData.map((r) => parseFloat(r[5])).filter((n) => !isNaN(n))),
-      balance:     avg(prevPeriodData.map((r) => parseFloat(r[7])).filter((n) => !isNaN(n))),
-    } : undefined;
-
-    // date range label from actual submitted dates
-    const submittedDates = cycleData.map((r) => new Date(r[2])).filter((d) => !isNaN(d.getTime()));
-    submittedDates.sort((a, b) => a.getTime() - b.getTime());
-    const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    const dateRange = submittedDates.length
-      ? { from: fmt(submittedDates[0]), to: fmt(submittedDates[submittedDates.length - 1]) }
-      : null;
-
-    // Expose the cycle bounds as ISO dates for the date picker
-    const cycleBounds = { from: toISODate(cycleFrom), to: toISODate(cycleTo) };
-
-    const feelings      = cycleData.map((r) => parseFloat(r[4])).filter((n) => !isNaN(n));
-    const stressSources = cycleData.map((r) => parseFloat(r[5])).filter((n) => !isNaN(n));
-    const balances      = cycleData.map((r) => parseFloat(r[7])).filter((n) => !isNaN(n));
-    const gptwScores    = cycleData.map((r) => parseFloat(r[12])).filter((n) => !isNaN(n));
-
-    // proud distribution
-    const proudCounts = { "Strongly Agree": 0, Agree: 0, Neutral: 0, Disagree: 0, "Strongly Disagree": 0 };
-    cycleData.forEach((r) => {
-      const v = r[8]?.trim() as keyof typeof proudCounts;
-      if (v in proudCounts) proudCounts[v]++;
-    });
-    const proudTotal = Object.values(proudCounts).reduce((a, b) => a + b, 0);
-
-    // GPTW distribution
-    const gptwDist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-    gptwScores.forEach((g) => { if (g >= 1 && g <= 5) gptwDist[Math.round(g)]++; });
-
-    // flower recipients
-    const flowerCounts: Record<string, number> = {};
-    cycleData.forEach((r) => {
-      parseNames(r[11] ?? "").forEach((name) => {
-        flowerCounts[name] = (flowerCounts[name] ?? 0) + 1;
-      });
-    });
-
-    // celebrations
-    const celebrations = cycleData.flatMap((r) =>
-      (r[9] ?? "").split(",").map((s) => s.trim()).filter(Boolean)
-    );
-
-    // open text
-    const stressors    = cycleData.map((r) => r[6]).filter(Boolean);
-    const supportNeeds = cycleData.map((r) => r[10]).filter(Boolean);
-
-    // Monthly trend — use ALL data so the chart shows history
+    // Build month map from all data (used for trend + available months list)
     const byMonthMap: Record<string, { feelings: number[]; stressSources: number[]; balances: number[]; date: Date }> = {};
     allPulseData.forEach((r) => {
       const date = new Date(r[2]);
       if (isNaN(date.getTime())) return;
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      const key = monthKey(date);
       if (!byMonthMap[key]) byMonthMap[key] = { feelings: [], stressSources: [], balances: [], date };
       const f = parseFloat(r[4]), s = parseFloat(r[5]), b = parseFloat(r[7]);
       if (!isNaN(f)) byMonthMap[key].feelings.push(f);
       if (!isNaN(s)) byMonthMap[key].stressSources.push(s);
       if (!isNaN(b)) byMonthMap[key].balances.push(b);
     });
-    const monthEntries = Object.entries(byMonthMap)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([, data]) => ({
-        month:       data.date.toLocaleDateString("en-US", { month: "short" }),
-        stress:      avg(data.feelings),
-        feeling:     avg(data.feelings),
-        balance:     avg(data.balances),
-        stressSource: avg(data.stressSources),
-      }));
 
-    // by-team feeling
+    const sortedMonthKeys = Object.keys(byMonthMap).sort();
+    const availableMonths = sortedMonthKeys.map((k) => ({
+      key: k,
+      label: byMonthMap[k].date.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+      short: byMonthMap[k].date.toLocaleDateString("en-US", { month: "short" }),
+    }));
+
+    // Determine active month: use param if provided, otherwise auto-detect
+    const now = new Date();
+    const autoMonth = monthKey(new Date(now.getFullYear(), now.getDate() >= 20 ? now.getMonth() : now.getMonth() - 1, 1));
+    const activeMonth = (monthParam && byMonthMap[monthParam]) ? monthParam : autoMonth;
+    const cycleLabel = byMonthMap[activeMonth]
+      ? byMonthMap[activeMonth].date.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+      : activeMonth;
+
+    // Filter to active month
+    const cycleData = allPulseData.filter((r) => {
+      const d = new Date(r[2]);
+      return !isNaN(d.getTime()) && monthKey(d) === activeMonth;
+    });
+
+    // Use all data as fallback if no responses in selected month
+    const usedData = cycleData.length > 0 ? cycleData : allPulseData;
+
+    // Prev month for comparison (always the month immediately before activeMonth)
+    const prevKey = prevMonthKey(activeMonth);
+    const prevPeriodData = allPulseData.filter((r) => {
+      const d = new Date(r[2]);
+      return !isNaN(d.getTime()) && monthKey(d) === prevKey;
+    });
+
+    const prevCycle = prevPeriodData.length > 0 ? {
+      feeling:      avg(prevPeriodData.map((r) => parseFloat(r[4])).filter((n) => !isNaN(n))),
+      stressSource: avg(prevPeriodData.map((r) => parseFloat(r[5])).filter((n) => !isNaN(n))),
+      balance:      avg(prevPeriodData.map((r) => parseFloat(r[7])).filter((n) => !isNaN(n))),
+    } : undefined;
+
+    // Date range label from actual submitted dates in cycle
+    const submittedDates = usedData.map((r) => new Date(r[2])).filter((d) => !isNaN(d.getTime()));
+    submittedDates.sort((a, b) => a.getTime() - b.getTime());
+    const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const dateRange = submittedDates.length
+      ? { from: fmt(submittedDates[0]), to: fmt(submittedDates[submittedDates.length - 1]) }
+      : null;
+
+    const feelings      = usedData.map((r) => parseFloat(r[4])).filter((n) => !isNaN(n));
+    const stressSources = usedData.map((r) => parseFloat(r[5])).filter((n) => !isNaN(n));
+    const balances      = usedData.map((r) => parseFloat(r[7])).filter((n) => !isNaN(n));
+    const gptwScores    = usedData.map((r) => parseFloat(r[12])).filter((n) => !isNaN(n));
+
+    const proudCounts = { "Strongly Agree": 0, Agree: 0, Neutral: 0, Disagree: 0, "Strongly Disagree": 0 };
+    usedData.forEach((r) => {
+      const v = r[8]?.trim() as keyof typeof proudCounts;
+      if (v in proudCounts) proudCounts[v]++;
+    });
+    const proudTotal = Object.values(proudCounts).reduce((a, b) => a + b, 0);
+
+    const gptwDist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    gptwScores.forEach((g) => { if (g >= 1 && g <= 5) gptwDist[Math.round(g)]++; });
+
+    const flowerCounts: Record<string, number> = {};
+    usedData.forEach((r) => {
+      parseNames(r[11] ?? "").forEach((name) => {
+        flowerCounts[name] = (flowerCounts[name] ?? 0) + 1;
+      });
+    });
+
+    const celebrations = usedData.flatMap((r) =>
+      (r[9] ?? "").split(",").map((s) => s.trim()).filter(Boolean)
+    );
+
+    const stressors    = usedData.map((r) => r[6]).filter(Boolean);
+    const supportNeeds = usedData.map((r) => r[10]).filter(Boolean);
+
+    const monthEntries = sortedMonthKeys.map((k) => ({
+      month:       byMonthMap[k].date.toLocaleDateString("en-US", { month: "short" }),
+      stress:      avg(byMonthMap[k].feelings),
+      feeling:     avg(byMonthMap[k].feelings),
+      balance:     avg(byMonthMap[k].balances),
+      stressSource: avg(byMonthMap[k].stressSources),
+    }));
+
     const byTeam: Record<string, number[]> = {};
-    cycleData.forEach((r) => {
+    usedData.forEach((r) => {
       const team = r[3]?.trim();
       const feeling = parseFloat(r[4]);
       if (team && !isNaN(feeling)) {
@@ -201,13 +190,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       source: "sheets",
       pulse: {
-        avgFeeling:     avg(feelings),
+        avgFeeling:      avg(feelings),
         avgStressSource: avg(stressSources),
-        avgBalance:     avg(balances),
-        avgGptw:        avg(gptwScores),
+        avgBalance:      avg(balances),
+        avgGptw:         avg(gptwScores),
         cycleLabel,
-        cycleBounds,
-        participation:  Math.round((cycleData.length / 27) * 100),
+        activeMonth,
+        availableMonths,
+        participation:   Math.round((usedData.length / 27) * 100),
         proudPct: proudTotal
           ? Math.round(((proudCounts["Strongly Agree"] + proudCounts.Agree) / proudTotal) * 100)
           : 0,
@@ -225,7 +215,7 @@ export async function GET(req: NextRequest) {
         byTeam: Object.fromEntries(
           Object.entries(byTeam).map(([team, scores]) => [team, avg(scores)])
         ),
-        responseCount: cycleData.length,
+        responseCount: usedData.length,
         teamSize: 27,
         dateRange,
         trend: monthEntries.map(({ month, stress, feeling, balance }) => ({ month, stress, feeling, balance })),
