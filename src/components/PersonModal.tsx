@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ENNEAGRAM_LABELS, STRENGTHS_DOMAINS } from "@/lib/constants";
 import { mbtiGroup, mbtiColor } from "@/lib/utils";
+import type { Person, Role } from "@/lib/types";
 
 function getTimezone(location: string): string {
   const l = location.toLowerCase();
@@ -11,7 +12,6 @@ function getTimezone(location: string): string {
   if (l.includes("pacific") || l.includes("pt") || l.includes("los angeles") || l.includes("seattle") || l.includes("san francisco") || l.includes("portland")) return "PT";
   return "ET";
 }
-import type { Person, Role } from "@/lib/types";
 
 interface PersonModalProps {
   person: Person;
@@ -79,7 +79,7 @@ Harvest utilization signal: ${person.stress} (low = healthy, medium = watch, hig
 Coach: ${person.coach}
 ${richContext}
 
-Generate the coaching narrative.`;
+Generate the Click for Sparks.`;
 
       const res = await fetch("/api/coaching", {
         method: "POST",
@@ -250,7 +250,7 @@ Generate the coaching narrative.`;
             <Field label="How to support me" value={person.burnout_support} />
           </div>
 
-          {/* Coaching narrative — gated */}
+          {/* Click for Sparks — gated */}
           {canSeeSensitive && (
             <div style={{ marginTop: 18, borderTop: "1px solid rgba(19,19,19,.08)", paddingTop: 18 }}>
               {narrativeError && (
@@ -263,7 +263,7 @@ Generate the coaching narrative.`;
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/sparks/spark-fill-1.svg" alt="" style={{ width: 13, height: 13, filter: "invert(1)" }} />
-                    <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".16em", textTransform: "uppercase", color: "rgba(245,245,245,.55)" }}>Coaching narrative</span>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".16em", textTransform: "uppercase", color: "rgba(245,245,245,.55)" }}>Click for Sparks</span>
                   </div>
                   <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13.5, lineHeight: 1.6 }}>{narrative}</div>
                   <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
@@ -278,7 +278,7 @@ Generate the coaching narrative.`;
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/sparks/spark-fill-1.svg" alt="" style={{ width: 13, height: 13 }} />
-                  {loading ? "Generating…" : "Generate coaching narrative"}
+                  {loading ? "Generating…" : "Generate Click for Sparks"}
                 </button>
               )}
             </div>

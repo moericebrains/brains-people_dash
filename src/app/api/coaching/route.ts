@@ -10,14 +10,14 @@ Markers of Excellence: Pivot with Purpose, Brave Ideas Bold Action, Speak Fluent
 Coaches not managers. Work is not your whole identity.`;
 
 const PERSON_INSTRUCTIONS = `You are a coaching intelligence tool for Brains. You are given a team member's full profile.
-Write a 4-5 sentence coaching narrative that:
+Write a 4-5 sentence Click for Sparks that:
 1. Opens with something insightful about how this person's personality profile shapes how they show up at work
 2. Connects their strengths to where they may be thriving or struggling RIGHT NOW given their pulse + stress signals
 3. Gives the coach 1-2 specific, practical suggestions grounded in Brains values
 Sound warm, direct, human. No bullet points. No preamble. No hedging.`;
 
 const ACTION_INSTRUCTIONS = `You are a coaching intelligence tool for Brains.
-Write a SHORT (3-4 sentences), direct, human coaching narrative. Sound like a thoughtful Brains leader.
+Write a SHORT (3-4 sentences), direct, human Click for Sparks. Sound like a thoughtful Brains leader.
 No bullet points. No preamble.`;
 
 const THEMES_INSTRUCTIONS = `You are analyzing open-text survey responses from a creative agency team.

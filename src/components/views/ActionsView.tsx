@@ -136,7 +136,7 @@ function ActionCardV2({ action, relPerson, onSelectPerson, narrative, loading, o
             <button onClick={handleGenerate} style={{ background: "transparent", border: "1px solid rgba(19,19,19,.20)", color: "#131313", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "8px 12px", borderRadius: 3, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 7 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/sparks/spark-fill-1.svg" alt="" style={{ width: 12, height: 12 }} />
-              Generate coaching narrative
+              Generate Click for Sparks
             </button>
           ) : (
             <div style={{ background: "var(--bof-off-black)", color: "var(--bof-off-white)", padding: "16px 18px", borderRadius: 4 }}>
@@ -144,7 +144,7 @@ function ActionCardV2({ action, relPerson, onSelectPerson, narrative, loading, o
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/sparks/spark-fill-1.svg" alt="" style={{ width: 13, height: 13, filter: "invert(1)" }} />
-                  <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(245,245,245,.45)" }}>Coaching narrative</span>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(245,245,245,.45)" }}>Click for Sparks</span>
                 </div>
                 <button onClick={() => setNarrativeOpen(false)} style={{ background: "transparent", border: 0, color: "rgba(245,245,245,.45)", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
               </div>
@@ -197,7 +197,7 @@ export default function ActionsView({ role, onSelectPerson }: ActionsViewProps) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "action",
-          prompt: `Signal: "${action.title}"\nContext: ${action.body}\nAudience: ${action.audience}\nValue: ${action.value}\n\nWrite the coaching narrative.`,
+          prompt: `Signal: "${action.title}"\nContext: ${action.body}\nAudience: ${action.audience}\nValue: ${action.value}\n\nWrite the Click for Sparks.`,
           personContext,
         }),
       });

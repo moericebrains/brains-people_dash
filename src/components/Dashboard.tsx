@@ -121,22 +121,83 @@ export default function Dashboard() {
       }
     };
     return (
-      <div style={{ background: "var(--bof-off-black, #131313)", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ background: "#FFFFFF", padding: "48px 44px", width: 360, borderTop: "3px solid var(--bof-orange, #EA5B32)" }}>
-          <img src="/brains-logo.png" alt="Brains" style={{ height: 20, marginBottom: 28, filter: "none", display: "block" }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-          <div style={{ fontFamily: "var(--font-display)", fontWeight: 300, fontSize: 28, color: "#131313", marginBottom: 6, letterSpacing: ".01em" }}>People Dashboard</div>
-          <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.45)", marginBottom: 28 }}>Internal · Brains agency</div>
-          <input
-            type="password"
-            value={siteInput}
-            onChange={(e) => setSiteInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && submit()}
-            placeholder="Password"
-            style={{ width: "100%", padding: "12px 14px", fontFamily: "var(--font-body-wide)", fontSize: 15, border: siteError ? "1px solid var(--bof-orange)" : "1px solid rgba(19,19,19,.20)", borderRadius: 3, outline: "none", marginBottom: 12, background: siteError ? "#FEF0EE" : "#FAFAFA", color: "#131313", boxSizing: "border-box" }}
-          />
-          <button onClick={submit} style={{ width: "100%", background: "var(--bof-orange, #EA5B32)", color: "#fff", border: "none", padding: "13px", fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", cursor: "pointer", borderRadius: 3 }}>
-            {siteError ? "Wrong password" : "Enter"}
-          </button>
+      <div style={{
+        minHeight: "100vh", display: "grid", placeItems: "center", padding: "48px 24px",
+        background: "#F5F4F1",
+        position: "relative",
+      }}>
+        {/* Radial grain */}
+        <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0,
+          background: "radial-gradient(circle at 12% 18%, rgba(234,91,50,0.07), transparent 40%), radial-gradient(circle at 88% 82%, rgba(46,115,84,0.08), transparent 45%)",
+        }} />
+
+        <div style={{ width: "100%", maxWidth: 420, position: "relative", zIndex: 1 }}>
+          {/* Decorative tilted bars */}
+          <span style={{ position: "absolute", width: 64, height: 16, background: "rgba(184,164,242,0.65)", transform: "rotate(-4deg)", top: -8, left: 28, borderRadius: 2, boxShadow: "0 2px 6px rgba(19,19,19,0.06)" }} />
+          <span style={{ position: "absolute", width: 64, height: 16, background: "rgba(237,193,87,0.75)", transform: "rotate(5deg)", top: -8, right: 24, borderRadius: 2, boxShadow: "0 2px 6px rgba(19,19,19,0.06)" }} />
+
+          <div style={{
+            background: "#FFFFFF",
+            border: "1px solid rgba(19,19,19,0.10)",
+            borderRadius: 14,
+            padding: "44px 42px 36px",
+            boxShadow: "0 1px 0 rgba(19,19,19,0.03), 0 30px 60px -32px rgba(19,19,19,0.18)",
+          }}>
+            {/* Logo */}
+            <div style={{ textAlign: "center", marginBottom: 4 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brains-logo.png" alt="Brains" style={{ height: 22, display: "inline-block" }}
+                onError={(e) => {
+                  const el = e.currentTarget as HTMLImageElement;
+                  el.style.display = "none";
+                  const next = el.nextElementSibling as HTMLElement | null;
+                  if (next) next.style.display = "inline-block";
+                }}
+              />
+              <span style={{ fontFamily: "var(--font-display)", fontWeight: 400, fontSize: 48, letterSpacing: "-1px", lineHeight: 1, color: "#131313", display: "none" }}>Brains</span>
+            </div>
+            <div style={{ textAlign: "center", fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: "1.6px", textTransform: "uppercase", color: "rgba(19,19,19,.45)", marginTop: 10, marginBottom: 4 }}>
+              People Dashboard
+            </div>
+            <div style={{ textAlign: "center", fontFamily: "var(--font-body-wide)", fontSize: 13, fontStyle: "italic", color: "rgba(19,19,19,.35)", marginBottom: 32 }}>
+              internal · brains agency
+            </div>
+
+            <input
+              type="password"
+              value={siteInput}
+              onChange={(e) => setSiteInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submit()}
+              placeholder="Password"
+              autoFocus
+              style={{
+                width: "100%", padding: "12px 14px",
+                fontFamily: "var(--font-body-wide)", fontSize: 15,
+                border: siteError ? "1px solid var(--bof-orange, #EA5B32)" : "1px solid rgba(19,19,19,.18)",
+                borderRadius: 9, outline: "none", marginBottom: 14,
+                background: siteError ? "#FEF0EE" : "#FAFAF9",
+                color: "#131313", boxSizing: "border-box",
+                boxShadow: siteError ? "0 0 0 3px rgba(234,91,50,0.10)" : "none",
+                transition: "border-color 140ms ease, box-shadow 140ms ease",
+              }}
+            />
+            <button
+              onClick={submit}
+              style={{
+                width: "100%", padding: "13px 16px",
+                border: "none", borderRadius: 10,
+                background: "#131313", color: "#FAFAF9",
+                fontFamily: "var(--font-body)", fontWeight: 700, fontSize: 13,
+                letterSpacing: ".10em", textTransform: "uppercase",
+                cursor: "pointer",
+                transition: "transform 140ms ease, background 140ms ease",
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#000"; (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#131313"; (e.currentTarget as HTMLButtonElement).style.transform = "none"; }}
+            >
+              {siteError ? "Wrong password — try again" : "Enter →"}
+            </button>
+          </div>
         </div>
       </div>
     );

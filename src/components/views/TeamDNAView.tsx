@@ -227,7 +227,11 @@ export default function TeamDNAView({ onSelectPerson, people = PEOPLE }: TeamDNA
 
   const allPersonPods = people.flatMap((p) => p.pod ? personPods(p.pod) : []);
   const PODS = ALLOWED_PODS.filter((pod) => allPersonPods.includes(pod));
-  const THEMES = [...new Set(people.map((p) => p.theme).filter(Boolean))];
+  const THEMES = [...new Set(
+    people.map((p) => p.theme).filter(Boolean)
+      .map((t) => POD_CANONICAL[t.trim().toLowerCase()] ?? t.trim())
+      .filter((t) => ALLOWED_PODS.includes(t) && !PODS.includes(t))
+  )];
   const lensOptions = [
     { id: "org", label: "FULL ORG" },
     ...PODS.map((p) => ({ id: `pod:${p}`, label: p.toUpperCase() })),
