@@ -241,9 +241,9 @@ export default function Dashboard() {
       <header style={{ borderBottom: "1px solid rgba(245,245,245,.10)", padding: "0 24px", display: "flex", alignItems: "stretch", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 0" }}>
           <img
-            src="/brains-logo.png"
+            src="/brains-logo-white.png"
             alt="Brains"
-            style={{ height: 22, filter: "brightness(0) invert(1)", display: "block" }}
+            style={{ height: 22, display: "block" }}
             onError={(e) => {
               const el = e.currentTarget as HTMLImageElement;
               el.style.display = "none";
