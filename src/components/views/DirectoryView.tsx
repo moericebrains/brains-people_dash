@@ -40,6 +40,14 @@ const AVATAR_COLORS = [
   "var(--bof-yellow)", "var(--bof-pink)",
 ];
 
+function getTimezone(location: string): string {
+  const l = location.toLowerCase();
+  if (l.includes("mountain") || l.includes("mt") || l.includes("denver") || l.includes("colorado") || l.includes("salt lake") || l.includes("phoenix") || l.includes("tucson")) return "MT";
+  if (l.includes("central") || l.includes("ct") || l.includes("chicago") || l.includes("dallas") || l.includes("houston") || l.includes("austin") || l.includes("minneapolis")) return "CT";
+  if (l.includes("pacific") || l.includes("pt") || l.includes("los angeles") || l.includes("seattle") || l.includes("san francisco") || l.includes("portland") || l.includes("vancouver")) return "PT";
+  return "ET";
+}
+
 function avatarColor(id: number) {
   return AVATAR_COLORS[id % AVATAR_COLORS.length];
 }
@@ -180,6 +188,7 @@ export default function DirectoryView({ onSelectPerson, people = PEOPLE }: Direc
               <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
                 <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, background: "rgba(19,19,19,.06)", color: "rgba(19,19,19,.55)", padding: "2px 6px", borderRadius: 2, letterSpacing: ".06em" }}>{p.pod}</span>
                 <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, background: "rgba(19,19,19,.06)", color: "rgba(19,19,19,.55)", padding: "2px 6px", borderRadius: 2, letterSpacing: ".06em" }}>{p.location}</span>
+                <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, background: "rgba(53,101,227,.10)", color: "var(--bof-blue)", padding: "2px 6px", borderRadius: 2, letterSpacing: ".06em" }}>{getTimezone(p.location)}</span>
               </div>
 
               {missing ? (

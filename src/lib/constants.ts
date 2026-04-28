@@ -145,12 +145,9 @@ export const PULSE_DATA = {
   current: { stress: 3.2, fulfillment: 7.8, balance: 6.4, support: 7.1, recognition: 6.9 },
   prev:    { stress: 4.1, fulfillment: 7.2, balance: 5.8, support: 6.5, recognition: 6.2 },
   trend: [
-    { month: "Aug", stress: 5.1, fulfillment: 6.4, joy: 6.8 },
-    { month: "Sep", stress: 4.8, fulfillment: 6.9, joy: 7.1 },
-    { month: "Oct", stress: 4.1, fulfillment: 7.2, joy: 7.4 },
-    { month: "Nov", stress: 3.9, fulfillment: 7.5, joy: 7.6 },
-    { month: "Dec", stress: 4.3, fulfillment: 7.1, joy: 7.0 },
-    { month: "Jan", stress: 3.2, fulfillment: 7.8, joy: 8.1 },
+    { month: "Feb", stress: 4.3, fulfillment: 7.1, joy: 7.0 },
+    { month: "Mar", stress: 3.8, fulfillment: 7.4, joy: 7.6 },
+    { month: "Apr", stress: 3.2, fulfillment: 7.8, joy: 8.1 },
   ],
   participation: 87,
   byValue: [
@@ -181,12 +178,12 @@ export const ONA_DATA: { nodes: OnaNode[]; alerts: { type: string; message: stri
   nodes: [
     { id: 1, name: "Strategy Pod", centrality: 0.82, team: "Strategy", bridge: true, overload: false, isolation_risk: false },
     { id: 2, name: "Creative Pod A", centrality: 0.91, team: "Creative", bridge: false, overload: false, isolation_risk: false },
-    { id: 3, name: "Creative Pod B", centrality: 0.54, team: "Creative", bridge: false, overload: false, isolation_risk: true },
+    { id: 3, name: "Pod 2", centrality: 0.54, team: "Creative", bridge: false, overload: false, isolation_risk: true },
     { id: 4, name: "PM Pod", centrality: 0.88, team: "Projects", bridge: true, overload: true, isolation_risk: false },
     { id: 5, name: "Ops", centrality: 0.41, team: "Admin", bridge: false, overload: false, isolation_risk: true },
   ],
   alerts: [
-    { type: "isolation", message: "Creative Pod B shows reduced cross-team connections this cycle" },
+    { type: "isolation", message: "Pod 2 shows reduced cross-team connections this cycle" },
     { type: "overload", message: "2 bridge connectors in PM Pod flagged for network overload" },
   ],
 };
@@ -200,9 +197,9 @@ export const ACTIONS = [
   },
   {
     audience: "leadership", urgency: "medium", value: "Look for Magic",
-    title: "Creative Pod B showing isolation risk in ONA",
+    title: "Pod 2 showing isolation risk in ONA",
     body: "This pod's cross-team connection score dropped significantly. Isolated pods produce less magic — creativity is a team sport at Brains.",
-    actions: ["Assign cross-pod creative buddy", "Add Pod B to next all-hands showcase", "Review pod meeting cadence"],
+    actions: ["Assign cross-pod creative buddy", "Add Pod 2 to next all-hands showcase", "Review pod meeting cadence"],
   },
   {
     audience: "coach", urgency: "high", value: "Care for Each Other",

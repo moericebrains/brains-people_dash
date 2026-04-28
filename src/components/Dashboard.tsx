@@ -11,6 +11,8 @@ import ActionsView from "./views/ActionsView";
 import TeamDNAView from "./views/TeamDNAView";
 import DirectoryView from "./views/DirectoryView";
 
+const SITE_PASSWORD = process.env.NEXT_PUBLIC_SITE_PASSWORD || "WLGforpresident2028";
+
 const PINS = {
   leadership: process.env.NEXT_PUBLIC_LEADERSHIP_PIN || "1111",
   coach: process.env.NEXT_PUBLIC_COACH_PIN || "2222",
@@ -32,6 +34,9 @@ const ROLES = [
 ];
 
 export default function Dashboard() {
+  const [siteUnlocked, setSiteUnlocked] = useState(false);
+  const [siteInput, setSiteInput] = useState("");
+  const [siteError, setSiteError] = useState(false);
   const [view, setView] = useState("pulse");
   const [role, setRole] = useState<Role>("ic");
   const [authOpen, setAuthOpen] = useState(false);
@@ -104,6 +109,38 @@ export default function Dashboard() {
       setTimeout(() => setPin(""), 1000);
     }
   };
+
+  if (!siteUnlocked) {
+    const submit = () => {
+      if (siteInput === SITE_PASSWORD) {
+        setSiteUnlocked(true);
+      } else {
+        setSiteError(true);
+        setSiteInput("");
+        setTimeout(() => setSiteError(false), 1200);
+      }
+    };
+    return (
+      <div style={{ background: "var(--bof-off-black, #131313)", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ background: "#FFFFFF", padding: "48px 44px", width: 360, borderTop: "3px solid var(--bof-orange, #EA5B32)" }}>
+          <img src="/brains-logo.png" alt="Brains" style={{ height: 20, marginBottom: 28, filter: "none", display: "block" }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+          <div style={{ fontFamily: "var(--font-display)", fontWeight: 300, fontSize: 28, color: "#131313", marginBottom: 6, letterSpacing: ".01em" }}>People Dashboard</div>
+          <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.45)", marginBottom: 28 }}>Internal · Brains agency</div>
+          <input
+            type="password"
+            value={siteInput}
+            onChange={(e) => setSiteInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+            placeholder="Password"
+            style={{ width: "100%", padding: "12px 14px", fontFamily: "var(--font-body-wide)", fontSize: 15, border: siteError ? "1px solid var(--bof-orange)" : "1px solid rgba(19,19,19,.20)", borderRadius: 3, outline: "none", marginBottom: 12, background: siteError ? "#FEF0EE" : "#FAFAFA", color: "#131313", boxSizing: "border-box" }}
+          />
+          <button onClick={submit} style={{ width: "100%", background: "var(--bof-orange, #EA5B32)", color: "#fff", border: "none", padding: "13px", fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", cursor: "pointer", borderRadius: 3 }}>
+            {siteError ? "Wrong password" : "Enter"}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ background: "var(--bof-off-black, #131313)", minHeight: "100vh", color: "#131313" }}>

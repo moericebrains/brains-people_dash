@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { PEOPLE, STRENGTHS_DOMAINS, ENNEAGRAM_LABELS, MBTI_GROUPS } from "@/lib/constants";
 import { pulseColor, mbtiGroup, mbtiColor } from "@/lib/utils";
 import type { Person } from "@/lib/types";
@@ -222,6 +222,8 @@ export default function TeamDNAView({ onSelectPerson, people = PEOPLE }: TeamDNA
   const [openStrength, setOpenStrength] = useState<string | null>(null);
   const [openEnn, setOpenEnn] = useState<string | null>(null);
   const [openMbti, setOpenMbti] = useState<string | null>(null);
+  const [podAdvice, setPodAdvice] = useState<string | null>(null);
+  const [podAdviceLoading, setPodAdviceLoading] = useState(false);
 
   const allPersonPods = people.flatMap((p) => p.pod ? personPods(p.pod) : []);
   const PODS = ALLOWED_PODS.filter((pod) => allPersonPods.includes(pod));
@@ -242,6 +244,73 @@ export default function TeamDNAView({ onSelectPerson, people = PEOPLE }: TeamDNA
   const mbtiCounts = getMbtiCounts(filtered);
   const total = filtered.length;
   const domainMax = Math.max(...Object.values(domainCounts));
+
+  const podLabel = lens.startsWith("pod:") ? lens.slice(4) : null;
+
+  const frameworkSummary = useMemo(() => {
+    if (!filtered.length) return "";
+    if (framework === "strengths") {
+      const topDomain = Object.entries(domainCounts).sort((a, b) => b[1] - a[1])[0];
+      const top3 = topStrengths.slice(0, 3);
+      const domainSentences: Record<string, string> = {
+        Executing: "This is a team that gets things done — ideas become outcomes here.",
+        Influencing: "This group knows how to move people and push work forward with conviction.",
+        Relationship: "Connection and trust are central to how this team operates — they show up for each other.",
+        Thinking: "This is a team of strategic thinkers who love complexity and are always looking ahead.",
+      };
+      return `${topDomain?.[0]} is the dominant domain (${topDomain?.[1]} strengths). Top talents: ${top3.join(", ")}. ${domainSentences[topDomain?.[0]] ?? ""}`;
+    }
+    if (framework === "enneagram") {
+      const top2 = ennCounts.slice(0, 2).map(([t, c]) => `${c}× Type ${t} (${ENNEAGRAM_LABELS[Number(t)] ?? ""})`);
+      const blend = ennCounts.length === 1 ? "a highly cohesive type cluster" : "a varied mix of core motivations";
+      return `The core is ${top2.join(" and ")} — ${blend}. Watch for how these types navigate conflict and praise differently.`;
+    }
+    if (framework === "mbti") {
+      const topType = mbtiCounts[0]?.[0] ?? "";
+      const iCount = filtered.filter((p) => p.mbti?.startsWith("I")).length;
+      const eCount = filtered.filter((p) => p.mbti?.startsWith("E")).length;
+      const tCount = filtered.filter((p) => p.mbti?.includes("T")).length;
+      const fCount = filtered.filter((p) => p.mbti?.includes("F")).length;
+      return `${eCount > iCount ? "Extroverts" : "Introverts"} lead ${Math.max(eCount, iCount)}–${Math.min(eCount, iCount)}. ${tCount > fCount ? "Thinking" : "Feeling"} types outnumber ${tCount > fCount ? "Feeling" : "Thinking"} ${Math.max(tCount, fCount)}–${Math.min(tCount, fCount)}. Most common type: ${topType}.`;
+    }
+    if (framework === "workstyle") {
+      const peakCounts: Record<string, number> = {};
+      filtered.forEach((p) => { if (p.peak_hours) peakCounts[p.peak_hours] = (peakCounts[p.peak_hours] ?? 0) + 1; });
+      const topPeak = Object.entries(peakCounts).sort((a, b) => b[1] - a[1])[0];
+      const introCount = filtered.filter((p) => p.intro_extro?.toLowerCase().includes("intro")).length;
+      if (!topPeak) return "Add peak hours and work style to the directory to unlock this summary.";
+      return `Most effective during ${topPeak[0]} (${topPeak[1]} people). ${introCount > filtered.length / 2 ? "Introverts make up the majority — honour async communication and quiet focus time." : "The group skews extroverted — energy comes from collaboration, so create space for it."}`;
+    }
+    return "";
+  }, [filtered, framework, domainCounts, topStrengths, ennCounts, mbtiCounts]);
+
+  const generatePodAdvice = async () => {
+    if (!podLabel) return;
+    setPodAdviceLoading(true);
+    setPodAdvice(null);
+    const profile = [
+      `Pod: ${podLabel} (${total} people)`,
+      `Top strengths: ${topStrengths.slice(0, 5).join(", ")}`,
+      `Dominant domain: ${Object.entries(domainCounts).sort((a, b) => b[1] - a[1])[0]?.[0]}`,
+      `MBTI types: ${mbtiCounts.slice(0, 4).map(([t, c]) => `${t}×${c}`).join(", ")}`,
+      `Enneagram types: ${ennCounts.slice(0, 3).map(([t, c]) => `Type ${t}×${c}`).join(", ")}`,
+    ].join("\n");
+    try {
+      const res = await fetch("/api/coaching", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "action",
+          prompt: `${profile}\n\nWrite a short (4–5 sentence) playbook for how ${podLabel} can work together at their best. Be specific to their personality profile. Ground it in Brains values.`,
+        }),
+      });
+      const data = await res.json() as { text?: string };
+      setPodAdvice(data.text ?? "");
+    } catch {
+      setPodAdvice("Unable to generate. Check your API key.");
+    }
+    setPodAdviceLoading(false);
+  };
 
   return (
     <div>
@@ -291,6 +360,50 @@ export default function TeamDNAView({ onSelectPerson, people = PEOPLE }: TeamDNA
           </div>
         ))}
       </div>
+
+      {/* Summary card */}
+      {frameworkSummary && (
+        <div style={{ background: "#FFFFFF", padding: "18px 22px", marginBottom: 1, boxShadow: "var(--shadow-md)", borderRadius: 4 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 16, alignItems: "flex-start" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/sparks/spark-fill-hero.svg" alt="" style={{ width: 40, height: 36, flexShrink: 0, marginTop: 2 }} />
+            <div>
+              <div className="d-eyebrow d-eyebrow--muted" style={{ marginBottom: 5 }}>
+                {podLabel ? `${podLabel} · ` : "Full org · "}{framework === "strengths" ? "StrengthsFinder" : framework === "enneagram" ? "Enneagram" : framework === "mbti" ? "Myers-Briggs" : "Work style"} summary
+              </div>
+              <p style={{ fontFamily: "var(--font-display)", fontWeight: 300, fontSize: 18, lineHeight: 1.3, margin: 0, letterSpacing: ".01em", color: "#131313" }}>
+                {frameworkSummary}
+              </p>
+            </div>
+          </div>
+          {podLabel && (
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(19,19,19,.08)" }}>
+              {!podAdvice && !podAdviceLoading ? (
+                <button onClick={generatePodAdvice} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "transparent", border: "1px solid rgba(19,19,19,.20)", color: "#131313", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "8px 12px", borderRadius: 3, cursor: "pointer" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/sparks/spark-fill-1.svg" alt="" style={{ width: 12, height: 12 }} />
+                  Generate {podLabel} working playbook
+                </button>
+              ) : podAdviceLoading ? (
+                <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.45)", fontStyle: "italic" }}>Generating…</div>
+              ) : (
+                <div style={{ background: "var(--bof-off-black)", color: "var(--bof-off-white)", padding: "16px 18px", borderRadius: 4 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/sparks/spark-fill-1.svg" alt="" style={{ width: 12, height: 12, filter: "invert(1)" }} />
+                      <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(245,245,245,.55)" }}>{podLabel} playbook</span>
+                    </div>
+                    <button onClick={() => { setPodAdvice(null); }} style={{ background: "transparent", border: 0, color: "rgba(245,245,245,.45)", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
+                  </div>
+                  <p style={{ fontFamily: "var(--font-body-wide)", margin: "0 0 12px", fontSize: 13.5, lineHeight: 1.6 }}>{podAdvice}</p>
+                  <button onClick={generatePodAdvice} style={{ background: "transparent", border: "1px solid rgba(245,245,245,.25)", color: "rgba(245,245,245,.85)", fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "6px 9px", borderRadius: 3, cursor: "pointer" }}>Regenerate</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* STRENGTHSFINDER */}
       {framework === "strengths" && (

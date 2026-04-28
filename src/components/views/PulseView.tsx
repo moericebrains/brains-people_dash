@@ -259,7 +259,6 @@ function TeamCoaching({ byTeam, fallbackByTeam }: { byTeam: Record<string, numbe
           </div>
           <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.55)" }}>Team nudges · rooted in markers of excellence</div>
         </div>
-        <button style={{ background: "transparent", border: "1px solid rgba(19,19,19,.20)", color: "#131313", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "7px 12px", borderRadius: 3, cursor: "pointer" }}>Send pod nudges</button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0, borderTop: "1px solid rgba(19,19,19,.10)" }}>
         {teams.map(([team, score], i) => {
@@ -294,9 +293,11 @@ interface PulseViewProps {
 
 export default function PulseView({ pulseData, role }: PulseViewProps) {
   const chartH = 70, chartW = 260, padX = 20;
-  const trendData = PULSE_DATA.trend.slice(-3);
+  const trendData = pulseData?.trend?.length
+    ? pulseData.trend.slice(-3)
+    : PULSE_DATA.trend.slice(-3).map((d) => ({ month: d.month, stress: d.stress, feeling: d.fulfillment, balance: 0 }));
 
-  const pts = (key: "stress" | "fulfillment" | "joy") =>
+  const pts = (key: "stress" | "feeling") =>
     trendData.map((d, i) => {
       const x = padX + (i / (trendData.length - 1)) * chartW;
       const y = chartH - (d[key] / 10) * chartH;
@@ -310,11 +311,16 @@ export default function PulseView({ pulseData, role }: PulseViewProps) {
   const participation = pulseData?.participation ?? PULSE_DATA.participation;
   const isLive = !!pulseData;
 
+  const prevFeeling = pulseData?.prevCycle?.feeling ?? PULSE_DATA.prev.fulfillment;
+  const prevStressSource = pulseData?.prevCycle?.stressSource ?? PULSE_DATA.prev.stress;
+  const prevBalance = pulseData?.prevCycle?.balance ?? PULSE_DATA.prev.balance;
+  const hasPrev = !!pulseData?.prevCycle;
+
   const kpis = [
-    { label: "Stress", val: feeling, prev: PULSE_DATA.prev.fulfillment, invert: true, unit: "/10", note: "1 = low stress · 10 = high stress" },
-    { label: "Stress source", val: stressSource, prev: PULSE_DATA.prev.stress, invert: true, unit: "/10", note: "1 = mostly work · 10 = mostly life" },
-    { label: "Work–life balance", val: balance, prev: PULSE_DATA.prev.balance, invert: false, unit: "/5" },
-    { label: "Great place to work", val: gptw, prev: PULSE_DATA.prev.recognition, invert: false, unit: "/5" },
+    { label: "Stress", val: feeling, prev: prevFeeling, invert: true, unit: "/10", note: "1 = low stress · 10 = high stress", showPrev: true },
+    { label: "Stress source", val: stressSource, prev: prevStressSource, invert: true, unit: "/10", note: "1 = mostly work · 10 = mostly life", showPrev: true },
+    { label: "Work–life balance", val: balance, prev: prevBalance, invert: false, unit: "/5", showPrev: true },
+    { label: "Great place to work", val: gptw, prev: PULSE_DATA.prev.recognition, invert: false, unit: "/5", showPrev: !isLive },
   ];
 
   const TEAM_CANONICAL: Record<string, string> = {
@@ -405,9 +411,11 @@ export default function PulseView({ pulseData, role }: PulseViewProps) {
                 <span style={{ fontFamily: "var(--font-body-wide)", fontSize: 16, color: "rgba(19,19,19,.45)" }}>{m.unit}</span>
               </div>
               {"note" in m && m.note && <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 12, color: "rgba(19,19,19,.45)", marginTop: 4 }}>{m.note as string}</div>}
-              {isLive
-                ? <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, marginTop: 6, color: "rgba(19,19,19,.45)" }}>{pulseData!.responseCount} responses</div>
-                : <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, marginTop: 6, color: good ? "var(--bof-green)" : "var(--bof-orange)" }}>{d.dir} {d.val} vs last</div>
+              {m.showPrev && (isLive ? hasPrev : true)
+                ? <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, marginTop: 6, color: good ? "var(--bof-green)" : "var(--bof-orange)" }}>{d.dir} {d.val} vs last</div>
+                : isLive && !m.showPrev
+                  ? <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, marginTop: 6, color: "rgba(19,19,19,.35)" }}>No prev cycle data</div>
+                  : <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, marginTop: 6, color: "rgba(19,19,19,.45)" }}>{pulseData?.responseCount ?? "—"} responses</div>
               }
             </div>
           );

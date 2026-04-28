@@ -88,6 +88,33 @@ export async function GET() {
     const stressors = pulseData.map((r) => r[6]).filter(Boolean);
     const supportNeeds = pulseData.map((r) => r[10]).filter(Boolean);
 
+    // Monthly trend — group by month from SubmittedAt
+    const byMonthMap: Record<string, { feelings: number[]; stressSources: number[]; balances: number[]; date: Date }> = {};
+    pulseData.forEach((r) => {
+      const date = new Date(r[2]);
+      if (isNaN(date.getTime())) return;
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      if (!byMonthMap[key]) byMonthMap[key] = { feelings: [], stressSources: [], balances: [], date };
+      const f = parseFloat(r[4]), s = parseFloat(r[5]), b = parseFloat(r[7]);
+      if (!isNaN(f)) byMonthMap[key].feelings.push(f);
+      if (!isNaN(s)) byMonthMap[key].stressSources.push(s);
+      if (!isNaN(b)) byMonthMap[key].balances.push(b);
+    });
+    const monthEntries = Object.entries(byMonthMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, data]) => ({
+        month: data.date.toLocaleDateString("en-US", { month: "short" }),
+        stress: avg(data.feelings),
+        feeling: avg(data.feelings),
+        balance: avg(data.balances),
+        stressSource: avg(data.stressSources),
+      }));
+    const prevCycle = monthEntries.length >= 2 ? {
+      feeling: monthEntries[monthEntries.length - 2].feeling,
+      stressSource: monthEntries[monthEntries.length - 2].stressSource,
+      balance: monthEntries[monthEntries.length - 2].balance,
+    } : undefined;
+
     // by-team feeling
     const byTeam: Record<string, number[]> = {};
     pulseData.forEach((r) => {
@@ -152,6 +179,8 @@ export async function GET() {
         responseCount: pulseData.length,
         teamSize: 54,
         dateRange,
+        trend: monthEntries.map(({ month, stress, feeling, balance }) => ({ month, stress, feeling, balance })),
+        prevCycle,
       },
       ona: {
         nodes,

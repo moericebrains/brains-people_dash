@@ -74,6 +74,8 @@ export interface PulseApiData {
   responseCount: number;
   teamSize: number;
   dateRange: { from: string; to: string } | null;
+  trend?: Array<{ month: string; stress: number; feeling: number; balance: number }>;
+  prevCycle?: { feeling: number; stressSource: number; balance: number };
 }
 
 export interface OnaApiData {

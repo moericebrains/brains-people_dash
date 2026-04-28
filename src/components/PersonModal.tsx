@@ -3,6 +3,14 @@
 import { useState } from "react";
 import { ENNEAGRAM_LABELS, STRENGTHS_DOMAINS } from "@/lib/constants";
 import { mbtiGroup, mbtiColor } from "@/lib/utils";
+
+function getTimezone(location: string): string {
+  const l = location.toLowerCase();
+  if (l.includes("mountain") || l.includes("mt") || l.includes("denver") || l.includes("colorado") || l.includes("salt lake") || l.includes("phoenix")) return "MT";
+  if (l.includes("central") || l.includes("ct") || l.includes("chicago") || l.includes("dallas") || l.includes("houston") || l.includes("austin") || l.includes("minneapolis")) return "CT";
+  if (l.includes("pacific") || l.includes("pt") || l.includes("los angeles") || l.includes("seattle") || l.includes("san francisco") || l.includes("portland")) return "PT";
+  return "ET";
+}
 import type { Person, Role } from "@/lib/types";
 
 interface PersonModalProps {
@@ -147,7 +155,7 @@ Generate the coaching narrative.`;
                 {person.name}
               </h2>
               <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.65)", marginBottom: 5 }}>
-                {person.role} · {person.pod} · {person.location}
+                {person.role} · {person.pod} · {person.location} · {getTimezone(person.location)}
               </div>
               <div style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(19,19,19,.45)" }}>
                 Coach: <span style={{ color: "#131313" }}>{person.coach}</span>
@@ -278,8 +286,14 @@ Generate the coaching narrative.`;
         </div>
 
         {/* Footer */}
-        <div style={{ padding: "14px 22px", borderTop: "1px solid rgba(19,19,19,.08)", display: "flex", gap: 8, flexShrink: 0 }}>
-          <button style={{ background: "var(--bof-orange)", color: "#fff", border: "none", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "10px 14px", borderRadius: 3, cursor: "pointer" }}>Start a 1:1 note</button>
+        <div style={{ padding: "14px 22px", borderTop: "1px solid rgba(19,19,19,.08)", display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
+          {canSeeSensitive && (
+            <button style={{ background: "var(--bof-orange)", color: "#fff", border: "none", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "10px 14px", borderRadius: 3, cursor: "pointer" }}>Start a 1:1 note</button>
+          )}
+          <button
+            onClick={() => alert(`Slack handles coming soon! Add ${person.name}'s handle to the directory sheet.`)}
+            style={{ background: "transparent", border: "1px solid rgba(19,19,19,.20)", color: "#131313", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "10px 14px", borderRadius: 3, cursor: "pointer" }}
+          >Send a Slack 🎬</button>
           <button onClick={onClose} style={{ background: "transparent", border: "1px solid rgba(19,19,19,.20)", color: "#131313", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "10px 14px", borderRadius: 3, cursor: "pointer" }}>Close</button>
         </div>
       </div>
