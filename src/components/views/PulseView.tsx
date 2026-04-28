@@ -196,7 +196,7 @@ function LeadershipFramework({ stressors, supportNeeds }: { stressors: string[];
           <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 12, color: "rgba(245,245,245,.35)", marginTop: 2 }}>Generated from this cycle&apos;s signals · rooted in markers of excellence</div>
         </div>
         <button onClick={generate} disabled={loading} style={{ background: loading ? "rgba(255,255,255,.1)" : "var(--bof-orange)", color: "#fff", border: "none", padding: "10px 18px", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", cursor: loading ? "default" : "pointer", borderRadius: 3, opacity: loading ? .7 : 1 }}>
-          {loading ? "Generating…" : framework ? "Regenerate" : "Generate framework"}
+          {loading ? "Sparking…" : "Click for Sparks"}
         </button>
       </div>
       {error && <div style={{ marginTop: 12, fontFamily: "var(--font-body-wide)", fontSize: 13, color: "var(--bof-orange)" }}>Error: {error}</div>}

@@ -386,10 +386,10 @@ export default function TeamDNAView({ onSelectPerson, people = PEOPLE }: TeamDNA
                 <button onClick={generatePodAdvice} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "transparent", border: "1px solid rgba(19,19,19,.20)", color: "#131313", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "8px 12px", borderRadius: 3, cursor: "pointer" }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/sparks/spark-fill-1.svg" alt="" style={{ width: 12, height: 12 }} />
-                  Generate {podLabel} working playbook
+                  Click for Sparks
                 </button>
               ) : podAdviceLoading ? (
-                <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.45)", fontStyle: "italic" }}>Generating…</div>
+                <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.45)", fontStyle: "italic" }}>Sparking…</div>
               ) : (
                 <div style={{ background: "var(--bof-off-black)", color: "var(--bof-off-white)", padding: "16px 18px", borderRadius: 4 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -401,7 +401,7 @@ export default function TeamDNAView({ onSelectPerson, people = PEOPLE }: TeamDNA
                     <button onClick={() => { setPodAdvice(null); }} style={{ background: "transparent", border: 0, color: "rgba(245,245,245,.45)", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
                   </div>
                   <p style={{ fontFamily: "var(--font-body-wide)", margin: "0 0 12px", fontSize: 13.5, lineHeight: 1.6 }}>{podAdvice}</p>
-                  <button onClick={generatePodAdvice} style={{ background: "transparent", border: "1px solid rgba(245,245,245,.25)", color: "rgba(245,245,245,.85)", fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "6px 9px", borderRadius: 3, cursor: "pointer" }}>Regenerate</button>
+                  <button onClick={generatePodAdvice} style={{ background: "transparent", border: "1px solid rgba(245,245,245,.25)", color: "rgba(245,245,245,.85)", fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "6px 9px", borderRadius: 3, cursor: "pointer" }}>Click for Sparks</button>
                 </div>
               )}
             </div>

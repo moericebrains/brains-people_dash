@@ -267,7 +267,7 @@ Generate the Click for Sparks.`;
                   </div>
                   <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13.5, lineHeight: 1.6 }}>{narrative}</div>
                   <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                    <button onClick={generateNarrative} style={{ background: "var(--bof-orange)", color: "#fff", border: "none", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "8px 12px", borderRadius: 3, cursor: "pointer" }}>Regenerate</button>
+                    <button onClick={generateNarrative} style={{ background: "var(--bof-orange)", color: "#fff", border: "none", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "8px 12px", borderRadius: 3, cursor: "pointer" }}>Click for Sparks</button>
                   </div>
                 </div>
               ) : (
@@ -278,7 +278,7 @@ Generate the Click for Sparks.`;
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/sparks/spark-fill-1.svg" alt="" style={{ width: 13, height: 13 }} />
-                  {loading ? "Generating…" : "Generate Click for Sparks"}
+                  {loading ? "Sparking…" : "Click for Sparks"}
                 </button>
               )}
             </div>

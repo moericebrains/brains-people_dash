@@ -136,7 +136,7 @@ function ActionCardV2({ action, relPerson, onSelectPerson, narrative, loading, o
             <button onClick={handleGenerate} style={{ background: "transparent", border: "1px solid rgba(19,19,19,.20)", color: "#131313", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "8px 12px", borderRadius: 3, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 7 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/sparks/spark-fill-1.svg" alt="" style={{ width: 12, height: 12 }} />
-              Generate Click for Sparks
+              Click for Sparks
             </button>
           ) : (
             <div style={{ background: "var(--bof-off-black)", color: "var(--bof-off-white)", padding: "16px 18px", borderRadius: 4 }}>
@@ -149,16 +149,16 @@ function ActionCardV2({ action, relPerson, onSelectPerson, narrative, loading, o
                 <button onClick={() => setNarrativeOpen(false)} style={{ background: "transparent", border: 0, color: "rgba(245,245,245,.45)", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
               </div>
               {loading ? (
-                <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(245,245,245,.45)", fontStyle: "italic" }}>Generating…</div>
+                <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(245,245,245,.45)", fontStyle: "italic" }}>Sparking…</div>
               ) : narrative ? (
                 <>
                   <p style={{ fontFamily: "var(--font-body-wide)", margin: 0, fontSize: 13.5, lineHeight: 1.6 }}>{narrative}</p>
                   <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                    <button onClick={onGenerate} style={{ background: "transparent", border: "1px solid rgba(245,245,245,.25)", color: "rgba(245,245,245,.85)", fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "6px 9px", borderRadius: 3, cursor: "pointer" }}>Regenerate</button>
+                    <button onClick={onGenerate} style={{ background: "transparent", border: "1px solid rgba(245,245,245,.25)", color: "rgba(245,245,245,.85)", fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "6px 9px", borderRadius: 3, cursor: "pointer" }}>Click for Sparks</button>
                   </div>
                 </>
               ) : (
-                <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(245,245,245,.45)", fontStyle: "italic" }}>No narrative generated yet.</div>
+                <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(245,245,245,.45)", fontStyle: "italic" }}>No sparks yet.</div>
               )}
             </div>
           )}
