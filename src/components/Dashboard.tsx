@@ -310,8 +310,8 @@ export default function Dashboard() {
         ))}
       </nav>
 
-      {/* Meta bar — month selector */}
-      <div style={{ padding: "8px 24px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      {/* Meta bar — month selector (hidden on personality + directory) */}
+      {!["teamdna", "directory"].includes(view) && <div style={{ padding: "8px 24px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(245,245,245,.35)", marginRight: 4 }}>Cycle</span>
           {(pulseApi?.availableMonths ?? []).map((m) => {
@@ -330,7 +330,7 @@ export default function Dashboard() {
         <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(245,245,245,.35)" }}>
           {pulseApi ? `${pulseApi.responseCount} of ${pulseApi.teamSize ?? 27} responded` : "— of 27 responded"}
         </span>
-      </div>
+      </div>}
 
       {/* Content */}
       <main style={{ padding: "0 16px 16px" }}>

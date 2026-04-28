@@ -365,45 +365,29 @@ export default function TeamDNAView({ onSelectPerson, people = PEOPLE }: TeamDNA
         ))}
       </div>
 
-      {/* Summary card */}
-      {frameworkSummary && (
-        <div style={{ background: "#FFFFFF", padding: "18px 22px", marginBottom: 1, boxShadow: "var(--shadow-md)", borderRadius: 4 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 16, alignItems: "flex-start" }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/sparks/spark-fill-hero.svg" alt="" style={{ width: 40, height: 36, flexShrink: 0, marginTop: 2 }} />
-            <div>
-              <div className="d-eyebrow d-eyebrow--muted" style={{ marginBottom: 5 }}>
-                {podLabel ? `${podLabel} · ` : "Full org · "}{framework === "strengths" ? "StrengthsFinder" : framework === "enneagram" ? "Enneagram" : framework === "mbti" ? "Myers-Briggs" : "Work style"} summary
-              </div>
-              <p style={{ fontFamily: "var(--font-display)", fontWeight: 300, fontSize: 18, lineHeight: 1.3, margin: 0, letterSpacing: ".01em", color: "#131313" }}>
-                {frameworkSummary}
-              </p>
-            </div>
-          </div>
-          {podLabel && (
-            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(19,19,19,.08)" }}>
-              {!podAdvice && !podAdviceLoading ? (
-                <button onClick={generatePodAdvice} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "transparent", border: "1px solid rgba(19,19,19,.20)", color: "#131313", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "8px 12px", borderRadius: 3, cursor: "pointer" }}>
+      {/* Pod playbook */}
+      {podLabel && (
+        <div style={{ marginBottom: 8 }}>
+          {!podAdvice && !podAdviceLoading ? (
+            <button onClick={generatePodAdvice} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "transparent", border: "1px solid rgba(19,19,19,.20)", color: "#131313", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "8px 12px", borderRadius: 3, cursor: "pointer" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/sparks/spark-fill-1.svg" alt="" style={{ width: 12, height: 12 }} />
+              Click for Sparks
+            </button>
+          ) : podAdviceLoading ? (
+            <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.45)", fontStyle: "italic" }}>Sparking…</div>
+          ) : (
+            <div style={{ background: "var(--bof-off-black)", color: "var(--bof-off-white)", padding: "16px 18px", borderRadius: 4 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/sparks/spark-fill-1.svg" alt="" style={{ width: 12, height: 12 }} />
-                  Click for Sparks
-                </button>
-              ) : podAdviceLoading ? (
-                <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.45)", fontStyle: "italic" }}>Sparking…</div>
-              ) : (
-                <div style={{ background: "var(--bof-off-black)", color: "var(--bof-off-white)", padding: "16px 18px", borderRadius: 4 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/sparks/spark-fill-1.svg" alt="" style={{ width: 12, height: 12, filter: "invert(1)" }} />
-                      <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(245,245,245,.55)" }}>{podLabel} playbook</span>
-                    </div>
-                    <button onClick={() => { setPodAdvice(null); }} style={{ background: "transparent", border: 0, color: "rgba(245,245,245,.45)", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
-                  </div>
-                  <p style={{ fontFamily: "var(--font-body-wide)", margin: "0 0 12px", fontSize: 13.5, lineHeight: 1.6 }}>{podAdvice}</p>
-                  <button onClick={generatePodAdvice} style={{ background: "transparent", border: "1px solid rgba(245,245,245,.25)", color: "rgba(245,245,245,.85)", fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "6px 9px", borderRadius: 3, cursor: "pointer" }}>Click for Sparks</button>
+                  <img src="/sparks/spark-fill-1.svg" alt="" style={{ width: 12, height: 12, filter: "invert(1)" }} />
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(245,245,245,.55)" }}>{podLabel} playbook</span>
                 </div>
-              )}
+                <button onClick={() => { setPodAdvice(null); }} style={{ background: "transparent", border: 0, color: "rgba(245,245,245,.45)", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
+              </div>
+              <p style={{ fontFamily: "var(--font-body-wide)", margin: "0 0 12px", fontSize: 13.5, lineHeight: 1.6 }}>{podAdvice}</p>
+              <button onClick={generatePodAdvice} style={{ background: "transparent", border: "1px solid rgba(245,245,245,.25)", color: "rgba(245,245,245,.85)", fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "6px 9px", borderRadius: 3, cursor: "pointer" }}>Click for Sparks</button>
             </div>
           )}
         </div>
