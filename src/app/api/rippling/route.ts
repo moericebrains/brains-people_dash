@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { PULSE_DATA, ONA_DATA } from "@/lib/constants";
 
 // Now reads from Google Sheets (pulse survey + ONA survey) instead of Rippling.
@@ -28,7 +28,14 @@ function avg(nums: number[]): number {
   return Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10;
 }
 
-export async function GET() {
+function toISODate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+export async function GET(req: NextRequest) {
+  const fromParam = req.nextUrl.searchParams.get("from"); // YYYY-MM-DD
+  const toParam   = req.nextUrl.searchParams.get("to");   // YYYY-MM-DD
+
   const key = process.env.GOOGLE_SHEETS_API_KEY;
   const pulseId = process.env.GOOGLE_PULSE_SHEET_ID;
   const onaId = process.env.GOOGLE_ONA_SHEET_ID;
@@ -46,24 +53,50 @@ export async function GET() {
     // ── Pulse aggregation ────────────────────────────────────────────────────
     const allPulseData = pulseRows.slice(1).filter((r) => r[4]); // skip header, skip empty
 
-    // Auto-detect current cycle month: survey goes out on the 20th, so
-    // on/after the 20th → current month; before the 20th → previous month.
+    // Determine cycle date bounds
     const now = new Date();
-    const cycleDate = new Date(now.getFullYear(), now.getDate() >= 20 ? now.getMonth() : now.getMonth() - 1, 1);
-    const cycleKey = `${cycleDate.getFullYear()}-${String(cycleDate.getMonth() + 1).padStart(2, "0")}`;
-    const cycleLabel = cycleDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    let cycleFrom: Date, cycleTo: Date;
 
-    // Filter to current cycle for all main metrics
-    const pulseData = allPulseData.filter((r) => {
+    if (fromParam && toParam) {
+      // Manual override from date picker
+      cycleFrom = new Date(fromParam + "T00:00:00");
+      cycleTo   = new Date(toParam   + "T23:59:59");
+    } else {
+      // Auto-detect: survey goes out on the 20th
+      // On/after the 20th → current month; before the 20th → previous month
+      cycleFrom = new Date(now.getFullYear(), now.getDate() >= 20 ? now.getMonth() : now.getMonth() - 1, 20);
+      cycleTo   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    }
+
+    const cycleLabel = cycleFrom.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+    // Filter to cycle range
+    const cycleRows = allPulseData.filter((r) => {
       const d = new Date(r[2]);
-      if (isNaN(d.getTime())) return false;
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` === cycleKey;
+      return !isNaN(d.getTime()) && d >= cycleFrom && d <= cycleTo;
     });
 
-    // Fall back to all data if current cycle has no responses yet
-    const cycleData = pulseData.length > 0 ? pulseData : allPulseData;
+    // Fall back to all data if no responses in range
+    const cycleData = cycleRows.length > 0 ? cycleRows : allPulseData;
 
-    // date range from SubmittedAt col (index 2)
+    // Apples-to-apples prev period: same day range, 1 month prior
+    const prevFrom = new Date(cycleFrom);
+    prevFrom.setMonth(prevFrom.getMonth() - 1);
+    const prevTo = new Date(cycleTo);
+    prevTo.setMonth(prevTo.getMonth() - 1);
+
+    const prevPeriodData = allPulseData.filter((r) => {
+      const d = new Date(r[2]);
+      return !isNaN(d.getTime()) && d >= prevFrom && d <= prevTo;
+    });
+
+    const prevCycle = prevPeriodData.length > 0 ? {
+      feeling:     avg(prevPeriodData.map((r) => parseFloat(r[4])).filter((n) => !isNaN(n))),
+      stressSource: avg(prevPeriodData.map((r) => parseFloat(r[5])).filter((n) => !isNaN(n))),
+      balance:     avg(prevPeriodData.map((r) => parseFloat(r[7])).filter((n) => !isNaN(n))),
+    } : undefined;
+
+    // date range label from actual submitted dates
     const submittedDates = cycleData.map((r) => new Date(r[2])).filter((d) => !isNaN(d.getTime()));
     submittedDates.sort((a, b) => a.getTime() - b.getTime());
     const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -71,10 +104,13 @@ export async function GET() {
       ? { from: fmt(submittedDates[0]), to: fmt(submittedDates[submittedDates.length - 1]) }
       : null;
 
-    const feelings = cycleData.map((r) => parseFloat(r[4])).filter((n) => !isNaN(n));
+    // Expose the cycle bounds as ISO dates for the date picker
+    const cycleBounds = { from: toISODate(cycleFrom), to: toISODate(cycleTo) };
+
+    const feelings      = cycleData.map((r) => parseFloat(r[4])).filter((n) => !isNaN(n));
     const stressSources = cycleData.map((r) => parseFloat(r[5])).filter((n) => !isNaN(n));
-    const balances = cycleData.map((r) => parseFloat(r[7])).filter((n) => !isNaN(n));
-    const gptwScores = cycleData.map((r) => parseFloat(r[12])).filter((n) => !isNaN(n));
+    const balances      = cycleData.map((r) => parseFloat(r[7])).filter((n) => !isNaN(n));
+    const gptwScores    = cycleData.map((r) => parseFloat(r[12])).filter((n) => !isNaN(n));
 
     // proud distribution
     const proudCounts = { "Strongly Agree": 0, Agree: 0, Neutral: 0, Disagree: 0, "Strongly Disagree": 0 };
@@ -88,7 +124,7 @@ export async function GET() {
     const gptwDist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     gptwScores.forEach((g) => { if (g >= 1 && g <= 5) gptwDist[Math.round(g)]++; });
 
-    // flower recipients (who cared for you)
+    // flower recipients
     const flowerCounts: Record<string, number> = {};
     cycleData.forEach((r) => {
       parseNames(r[11] ?? "").forEach((name) => {
@@ -96,13 +132,13 @@ export async function GET() {
       });
     });
 
-    // celebrations — split comma-separated entries into individual items
+    // celebrations
     const celebrations = cycleData.flatMap((r) =>
       (r[9] ?? "").split(",").map((s) => s.trim()).filter(Boolean)
     );
 
-    // open text: stressors + support needs
-    const stressors = cycleData.map((r) => r[6]).filter(Boolean);
+    // open text
+    const stressors    = cycleData.map((r) => r[6]).filter(Boolean);
     const supportNeeds = cycleData.map((r) => r[10]).filter(Boolean);
 
     // Monthly trend — use ALL data so the chart shows history
@@ -120,17 +156,12 @@ export async function GET() {
     const monthEntries = Object.entries(byMonthMap)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([, data]) => ({
-        month: data.date.toLocaleDateString("en-US", { month: "short" }),
-        stress: avg(data.feelings),
-        feeling: avg(data.feelings),
-        balance: avg(data.balances),
+        month:       data.date.toLocaleDateString("en-US", { month: "short" }),
+        stress:      avg(data.feelings),
+        feeling:     avg(data.feelings),
+        balance:     avg(data.balances),
         stressSource: avg(data.stressSources),
       }));
-    const prevCycle = monthEntries.length >= 2 ? {
-      feeling: monthEntries[monthEntries.length - 2].feeling,
-      stressSource: monthEntries[monthEntries.length - 2].stressSource,
-      balance: monthEntries[monthEntries.length - 2].balance,
-    } : undefined;
 
     // by-team feeling
     const byTeam: Record<string, number[]> = {};
@@ -148,7 +179,6 @@ export async function GET() {
 
     const infoEaseScores = onaData.map((r) => parseFloat(r[4])).filter((n) => !isNaN(n));
 
-    // In-degree centrality: count mentions per person across advice + stuck cols
     const mentions: Record<string, number> = {};
     onaData.forEach((r) => {
       [...parseNames(r[3] ?? ""), ...parseNames(r[5] ?? "")].forEach((name) => {
@@ -171,20 +201,21 @@ export async function GET() {
     return NextResponse.json({
       source: "sheets",
       pulse: {
-        avgFeeling: avg(feelings),
+        avgFeeling:     avg(feelings),
         avgStressSource: avg(stressSources),
-        avgBalance: avg(balances),
-        avgGptw: avg(gptwScores),
+        avgBalance:     avg(balances),
+        avgGptw:        avg(gptwScores),
         cycleLabel,
-        participation: Math.round((cycleData.length / 27) * 100), // 27 team members per cycle
+        cycleBounds,
+        participation:  Math.round((cycleData.length / 27) * 100),
         proudPct: proudTotal
           ? Math.round(((proudCounts["Strongly Agree"] + proudCounts.Agree) / proudTotal) * 100)
           : 0,
         proudDist: {
           stronglyAgree: proudTotal ? Math.round((proudCounts["Strongly Agree"] / proudTotal) * 100) : 0,
-          agree: proudTotal ? Math.round((proudCounts.Agree / proudTotal) * 100) : 0,
-          neutral: proudTotal ? Math.round((proudCounts.Neutral / proudTotal) * 100) : 0,
-          disagree: proudTotal ? Math.round(((proudCounts.Disagree + proudCounts["Strongly Disagree"]) / proudTotal) * 100) : 0,
+          agree:         proudTotal ? Math.round((proudCounts.Agree / proudTotal) * 100) : 0,
+          neutral:       proudTotal ? Math.round((proudCounts.Neutral / proudTotal) * 100) : 0,
+          disagree:      proudTotal ? Math.round(((proudCounts.Disagree + proudCounts["Strongly Disagree"]) / proudTotal) * 100) : 0,
         },
         gptwDist,
         flowerCounts,
@@ -194,8 +225,8 @@ export async function GET() {
         byTeam: Object.fromEntries(
           Object.entries(byTeam).map(([team, scores]) => [team, avg(scores)])
         ),
-        responseCount: pulseData.length,
-        teamSize: 54,
+        responseCount: cycleData.length,
+        teamSize: 27,
         dateRange,
         trend: monthEntries.map(({ month, stress, feeling, balance }) => ({ month, stress, feeling, balance })),
         prevCycle,

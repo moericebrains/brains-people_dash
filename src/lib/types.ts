@@ -74,6 +74,7 @@ export interface PulseApiData {
   responseCount: number;
   teamSize: number;
   cycleLabel?: string;
+  cycleBounds?: { from: string; to: string };
   dateRange: { from: string; to: string } | null;
   trend?: Array<{ month: string; stress: number; feeling: number; balance: number }>;
   prevCycle?: { feeling: number; stressSource: number; balance: number };

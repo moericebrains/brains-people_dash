@@ -47,10 +47,16 @@ export default function Dashboard() {
   const [onaApi, setOnaApi] = useState<OnaApiData | null>(null);
   const [harvestApi, setHarvestApi] = useState<HarvestData | null>(null);
   const [harvestRange, setHarvestRange] = useState<"current" | "3m" | "6m">("current");
+  const [cycleFrom, setCycleFrom] = useState("");
+  const [cycleTo, setCycleTo] = useState("");
   const [people, setPeople] = useState<Person[]>(PEOPLE);
 
   useEffect(() => {
-    fetch("/api/rippling")
+    const params = new URLSearchParams();
+    if (cycleFrom) params.set("from", cycleFrom);
+    if (cycleTo)   params.set("to",   cycleTo);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    fetch(`/api/rippling${qs}`)
       .then((r) => r.json())
       .then((d: { pulse: PulseApiData; ona: OnaApiData }) => {
         setPulseApi(d.pulse);
@@ -77,7 +83,7 @@ export default function Dashboard() {
     };
     window.addEventListener("peopledash:selectperson", handleSelectPerson);
     return () => window.removeEventListener("peopledash:selectperson", handleSelectPerson);
-  }, [harvestRange]);
+  }, [harvestRange, cycleFrom, cycleTo]);
 
   // Derive FLOWERS list from live pulse flowerCounts, fall back to PULSE_DATA mock
   const flowerCounts = pulseApi?.flowerCounts ?? {};
@@ -308,16 +314,29 @@ export default function Dashboard() {
         ))}
       </nav>
 
-      {/* Meta bar */}
-      <div style={{ padding: "8px 24px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(245,245,245,.35)" }}>
-        <span>
-          <span style={{ color: "rgba(245,245,245,.7)" }}>Pulse cycle</span>
-          {pulseApi?.dateRange
-            ? ` · ${pulseApi.dateRange.from} — ${pulseApi.dateRange.to}`
-            : " · Current cycle"}
-        </span>
-        <span>
-          {pulseApi ? `${pulseApi.responseCount} of ${pulseApi.teamSize ?? 34} responded` : "34 of 34 responded"}
+      {/* Meta bar — cycle date picker */}
+      <div style={{ padding: "8px 24px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(245,245,245,.40)" }}>Cycle</span>
+          <input
+            type="date"
+            value={cycleFrom || pulseApi?.cycleBounds?.from || ""}
+            onChange={(e) => setCycleFrom(e.target.value)}
+            style={{ background: "rgba(245,245,245,.08)", border: "1px solid rgba(245,245,245,.15)", color: "#F5F5F5", fontFamily: "var(--font-body)", fontSize: 11, padding: "4px 8px", borderRadius: 3, outline: "none", colorScheme: "dark" }}
+          />
+          <span style={{ color: "rgba(245,245,245,.30)", fontSize: 11 }}>→</span>
+          <input
+            type="date"
+            value={cycleTo || pulseApi?.cycleBounds?.to || ""}
+            onChange={(e) => setCycleTo(e.target.value)}
+            style={{ background: "rgba(245,245,245,.08)", border: "1px solid rgba(245,245,245,.15)", color: "#F5F5F5", fontFamily: "var(--font-body)", fontSize: 11, padding: "4px 8px", borderRadius: 3, outline: "none", colorScheme: "dark" }}
+          />
+          {(cycleFrom || cycleTo) && (
+            <button onClick={() => { setCycleFrom(""); setCycleTo(""); }} style={{ background: "transparent", border: "none", color: "rgba(245,245,245,.35)", fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", cursor: "pointer", padding: "4px 6px" }}>Reset</button>
+          )}
+        </div>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(245,245,245,.35)" }}>
+          {pulseApi ? `${pulseApi.responseCount} of ${pulseApi.teamSize ?? 27} responded` : "— of 27 responded"}
         </span>
       </div>
 
