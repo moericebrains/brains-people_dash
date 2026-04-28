@@ -46,6 +46,7 @@ export default function Dashboard() {
   const [pulseApi, setPulseApi] = useState<PulseApiData | null>(null);
   const [onaApi, setOnaApi] = useState<OnaApiData | null>(null);
   const [harvestApi, setHarvestApi] = useState<HarvestData | null>(null);
+  const [harvestRange, setHarvestRange] = useState<"current" | "3m" | "6m">("current");
   const [people, setPeople] = useState<Person[]>(PEOPLE);
 
   useEffect(() => {
@@ -64,7 +65,7 @@ export default function Dashboard() {
       })
       .catch(console.error);
 
-    fetch("/api/harvest")
+    fetch(`/api/harvest?range=${harvestRange}`)
       .then((r) => r.json())
       .then((d: HarvestData) => setHarvestApi(d))
       .catch(console.error);
@@ -76,7 +77,7 @@ export default function Dashboard() {
     };
     window.addEventListener("peopledash:selectperson", handleSelectPerson);
     return () => window.removeEventListener("peopledash:selectperson", handleSelectPerson);
-  }, []);
+  }, [harvestRange]);
 
   // Derive FLOWERS list from live pulse flowerCounts, fall back to PULSE_DATA mock
   const flowerCounts = pulseApi?.flowerCounts ?? {};
@@ -324,7 +325,7 @@ export default function Dashboard() {
       <main style={{ padding: "0 16px 16px" }}>
         {view === "pulse"        && <PulseView pulseData={pulseApi} role={role} />}
         {view === "satisfaction" && <SatisfactionView pulseData={pulseApi} onaData={onaApi} flowers={liveFlowers.length ? liveFlowers : undefined} />}
-        {view === "stress"       && <StressView onaNodes={onaNodes} onaAlerts={onaAlerts} harvestData={harvestApi ?? { source: "mock", range: "current", orgAvg: STRESS_DATA.orgAvg, teams: STRESS_DATA.teams.map((t) => ({ ...t, trend: t.trend as "up" | "down" | "stable" })) }} role={role} dateRange={pulseApi?.dateRange} />}
+        {view === "stress"       && <StressView onaNodes={onaNodes} onaAlerts={onaAlerts} harvestData={harvestApi ?? { source: "mock", range: "current", orgAvg: STRESS_DATA.orgAvg, teams: STRESS_DATA.teams.map((t) => ({ ...t, trend: t.trend as "up" | "down" | "stable" })) }} role={role} dateRange={pulseApi?.dateRange} cycleLabel={pulseApi?.cycleLabel} harvestRange={harvestRange} onHarvestRangeChange={setHarvestRange} />}
         {view === "actions"      && <ActionsView role={role} onSelectPerson={setSelectedPerson} dateRange={pulseApi?.dateRange} />}
         {view === "teamdna"      && <TeamDNAView onSelectPerson={setSelectedPerson} people={people} />}
         {view === "directory"    && <DirectoryView role={role} onSelectPerson={setSelectedPerson} people={people} />}

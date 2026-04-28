@@ -44,24 +44,41 @@ export async function GET() {
     ]);
 
     // ── Pulse aggregation ────────────────────────────────────────────────────
-    const pulseData = pulseRows.slice(1).filter((r) => r[4]); // skip header, skip empty
+    const allPulseData = pulseRows.slice(1).filter((r) => r[4]); // skip header, skip empty
+
+    // Auto-detect current cycle month: survey goes out on the 20th, so
+    // on/after the 20th → current month; before the 20th → previous month.
+    const now = new Date();
+    const cycleDate = new Date(now.getFullYear(), now.getDate() >= 20 ? now.getMonth() : now.getMonth() - 1, 1);
+    const cycleKey = `${cycleDate.getFullYear()}-${String(cycleDate.getMonth() + 1).padStart(2, "0")}`;
+    const cycleLabel = cycleDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+    // Filter to current cycle for all main metrics
+    const pulseData = allPulseData.filter((r) => {
+      const d = new Date(r[2]);
+      if (isNaN(d.getTime())) return false;
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` === cycleKey;
+    });
+
+    // Fall back to all data if current cycle has no responses yet
+    const cycleData = pulseData.length > 0 ? pulseData : allPulseData;
 
     // date range from SubmittedAt col (index 2)
-    const submittedDates = pulseData.map((r) => new Date(r[2])).filter((d) => !isNaN(d.getTime()));
+    const submittedDates = cycleData.map((r) => new Date(r[2])).filter((d) => !isNaN(d.getTime()));
     submittedDates.sort((a, b) => a.getTime() - b.getTime());
     const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     const dateRange = submittedDates.length
       ? { from: fmt(submittedDates[0]), to: fmt(submittedDates[submittedDates.length - 1]) }
       : null;
 
-    const feelings = pulseData.map((r) => parseFloat(r[4])).filter((n) => !isNaN(n));
-    const stressSources = pulseData.map((r) => parseFloat(r[5])).filter((n) => !isNaN(n));
-    const balances = pulseData.map((r) => parseFloat(r[7])).filter((n) => !isNaN(n));
-    const gptwScores = pulseData.map((r) => parseFloat(r[12])).filter((n) => !isNaN(n));
+    const feelings = cycleData.map((r) => parseFloat(r[4])).filter((n) => !isNaN(n));
+    const stressSources = cycleData.map((r) => parseFloat(r[5])).filter((n) => !isNaN(n));
+    const balances = cycleData.map((r) => parseFloat(r[7])).filter((n) => !isNaN(n));
+    const gptwScores = cycleData.map((r) => parseFloat(r[12])).filter((n) => !isNaN(n));
 
     // proud distribution
     const proudCounts = { "Strongly Agree": 0, Agree: 0, Neutral: 0, Disagree: 0, "Strongly Disagree": 0 };
-    pulseData.forEach((r) => {
+    cycleData.forEach((r) => {
       const v = r[8]?.trim() as keyof typeof proudCounts;
       if (v in proudCounts) proudCounts[v]++;
     });
@@ -73,24 +90,24 @@ export async function GET() {
 
     // flower recipients (who cared for you)
     const flowerCounts: Record<string, number> = {};
-    pulseData.forEach((r) => {
+    cycleData.forEach((r) => {
       parseNames(r[11] ?? "").forEach((name) => {
         flowerCounts[name] = (flowerCounts[name] ?? 0) + 1;
       });
     });
 
     // celebrations — split comma-separated entries into individual items
-    const celebrations = pulseData.flatMap((r) =>
+    const celebrations = cycleData.flatMap((r) =>
       (r[9] ?? "").split(",").map((s) => s.trim()).filter(Boolean)
     );
 
     // open text: stressors + support needs
-    const stressors = pulseData.map((r) => r[6]).filter(Boolean);
-    const supportNeeds = pulseData.map((r) => r[10]).filter(Boolean);
+    const stressors = cycleData.map((r) => r[6]).filter(Boolean);
+    const supportNeeds = cycleData.map((r) => r[10]).filter(Boolean);
 
-    // Monthly trend — group by month from SubmittedAt
+    // Monthly trend — use ALL data so the chart shows history
     const byMonthMap: Record<string, { feelings: number[]; stressSources: number[]; balances: number[]; date: Date }> = {};
-    pulseData.forEach((r) => {
+    allPulseData.forEach((r) => {
       const date = new Date(r[2]);
       if (isNaN(date.getTime())) return;
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -117,7 +134,7 @@ export async function GET() {
 
     // by-team feeling
     const byTeam: Record<string, number[]> = {};
-    pulseData.forEach((r) => {
+    cycleData.forEach((r) => {
       const team = r[3]?.trim();
       const feeling = parseFloat(r[4]);
       if (team && !isNaN(feeling)) {
@@ -158,7 +175,8 @@ export async function GET() {
         avgStressSource: avg(stressSources),
         avgBalance: avg(balances),
         avgGptw: avg(gptwScores),
-        participation: Math.round((pulseData.length / 54) * 100), // 2 pulses × 27 members = 54 potential responses
+        cycleLabel,
+        participation: Math.round((cycleData.length / 27) * 100), // 27 team members per cycle
         proudPct: proudTotal
           ? Math.round(((proudCounts["Strongly Agree"] + proudCounts.Agree) / proudTotal) * 100)
           : 0,

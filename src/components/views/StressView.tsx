@@ -10,6 +10,9 @@ interface StressViewProps {
   harvestData: HarvestData;
   role?: Role;
   dateRange?: { from: string; to: string } | null;
+  cycleLabel?: string;
+  harvestRange?: "current" | "3m" | "6m";
+  onHarvestRangeChange?: (r: "current" | "3m" | "6m") => void;
 }
 
 // ── Target-band bar ─────────────────────────────────────────────────────────────
@@ -31,9 +34,15 @@ function TargetBar({ pct, danger }: { pct: number; danger?: boolean }) {
   );
 }
 
-export default function StressView({ onaNodes = [], harvestData, role = "ic" }: StressViewProps) {
+export default function StressView({ onaNodes = [], harvestData, role = "ic", cycleLabel, harvestRange = "current", onHarvestRangeChange }: StressViewProps) {
   const { orgAvg, teams } = harvestData;
   const burnoutCount = teams.filter((t) => t.burnoutRisk).length;
+
+  const RANGES: { id: "current" | "3m" | "6m"; label: string }[] = [
+    { id: "current", label: cycleLabel ?? "This month" },
+    { id: "3m", label: "3 months" },
+    { id: "6m", label: "6 months" },
+  ];
 
   // ONA story-sort
   const ONA_GROUPS = [
@@ -56,6 +65,20 @@ export default function StressView({ onaNodes = [], harvestData, role = "ic" }: 
 
   return (
     <div>
+      {/* ── Range selector ── */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center" }}>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(19,19,19,.40)", marginRight: 4 }}>Time range</span>
+        {RANGES.map((r) => (
+          <button key={r.id} onClick={() => onHarvestRangeChange?.(r.id)} style={{
+            fontFamily: "var(--font-body)", fontWeight: 700, fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase",
+            padding: "5px 10px", borderRadius: 3, cursor: "pointer", border: "none",
+            background: harvestRange === r.id ? "var(--bof-off-black)" : "rgba(19,19,19,.06)",
+            color: harvestRange === r.id ? "#F5F5F5" : "#131313",
+            transition: "all .15s",
+          }}>{r.label}</button>
+        ))}
+      </div>
+
       {/* ── Top tiles ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
         {[

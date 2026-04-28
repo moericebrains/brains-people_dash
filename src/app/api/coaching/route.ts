@@ -25,7 +25,8 @@ Extract the top 5 themes. Return ONLY valid JSON — an array of objects with ke
 
 const FRAMEWORK_INSTRUCTIONS = `You are a senior leadership coach at Brains, an independent creative agency and B-Corp.
 Based on the stress signals and support needs from the team's pulse survey, write a concise leadership framework — practical actions for this cycle grounded in Brains' markers of excellence and values.
-Format: 3-4 named action areas, each with a 1-sentence directive. Sound like a thoughtful, warm Brains leader. No fluff. No generic advice.`;
+Format: 3-4 named action areas, each with a 1-sentence directive. Sound like a thoughtful, warm Brains leader. No fluff. No generic advice.
+IMPORTANT: Never assign numerical scores, percentages, or trend language ("rising", "falling", "improving", "declining") to Brains values (We Care for Each Other, We Do Good Work, We Look for Magic, We Spark Joy) or Markers of Excellence (Pivot with Purpose, Brave Ideas Bold Action, Speak Fluent Client, Work Out Loud, Enjoy the Ride). These are qualitative principles, not tracked metrics — reference them as guidance only.`;
 
 export async function POST(req: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) {
