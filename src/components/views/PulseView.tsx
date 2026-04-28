@@ -1,117 +1,209 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PULSE_DATA } from "@/lib/constants";
 import { pulseColor, delta } from "@/lib/utils";
 import MiniBar from "@/components/ui/MiniBar";
 import type { PulseApiData } from "@/lib/types";
 
-interface Theme { theme: string; count: number; insight: string; }
+// ── Option-counting helpers ────────────────────────────────────────────────────
 
-function OpenTextPanel({ title, responses, accentColor }: { title: string; responses: string[]; accentColor: string }) {
-  const [themes, setThemes] = useState<Theme[] | null>(null);
-  const [loading, setLoading] = useState(false);
+const SUPPORT_OPTIONS = [
+  "Assistance Prioritizing Workload",
+  "Increased Flexibility",
+  "Constructive Feedback",
+  "Additional Skills Development",
+  "Space for Mental Health Challenges",
+  "Other",
+];
 
-  const extractThemes = async () => {
-    if (!responses.length) return;
-    setLoading(true);
-    try {
-      const res = await fetch("/api/coaching", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "themes",
-          prompt: `Survey responses:\n${responses.map((r, i) => `${i + 1}. ${r}`).join("\n")}`,
-        }),
-      });
-      const data = await res.json() as { themes: Theme[] };
-      setThemes(data.themes ?? []);
-    } finally {
-      setLoading(false);
-    }
-  };
+const STRESS_OPTIONS = [
+  "Heavy Workload",
+  "Meeting Overload",
+  "Lack of Focus Time",
+  "Conflicting Deadlines",
+  "Learning Curve/New Project",
+  "Communication Challenges",
+  "My Own Self-Imposed Pressure",
+  "Work/Life Balance Challenges",
+  "Other",
+];
+
+function countOptions(responses: string[], options: string[]): { label: string; count: number }[] {
+  const counts: Record<string, number> = {};
+  options.forEach((o) => { counts[o] = 0; });
+  responses.forEach((r) => {
+    r.split(",").map((s) => s.trim()).forEach((item) => {
+      const match = options.find((o) => o.toLowerCase() === item.toLowerCase());
+      if (match) counts[match]++;
+      else if (item) counts["Other"] = (counts["Other"] ?? 0) + 1;
+    });
+  });
+  return Object.entries(counts)
+    .filter(([, c]) => c > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, count]) => ({ label, count }));
+}
+
+const countStressOptions = (r: string[]) => countOptions(r, STRESS_OPTIONS);
+const countSupportOptions = (r: string[]) => countOptions(r, SUPPORT_OPTIONS);
+
+// ── Participation donut ─────────────────────────────────────────────────────────
+
+function ParticipationPie({ responded, total }: { responded: number; total: number }) {
+  const pct = Math.min(1, responded / Math.max(1, total));
+  const r = 54, cx = 70, cy = 70, stroke = 12;
+  const circumference = 2 * Math.PI * r;
+  const filled = pct * circumference;
+  const color = pct >= 0.8 ? "var(--bof-green)" : "var(--bof-yellow)";
+  return (
+    <div style={{ position: "relative", width: 140, height: 140 }}>
+      <svg width="140" height="140">
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(19,19,19,.08)" strokeWidth={stroke} />
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={stroke}
+          strokeDasharray={`${filled} ${circumference}`}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${cx} ${cy})`}
+        />
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 28, fontWeight: 700, color, lineHeight: 1 }}>{Math.round(pct * 100)}%</div>
+        <div style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(19,19,19,.45)", marginTop: 3 }}>{responded}/{total}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Stressors + support panels ─────────────────────────────────────────────────
+
+function StressorsPanel({ responses }: { responses: string[] }) {
+  const options = countStressOptions(responses);
+  const maxCount = options[0]?.count ?? 1;
+  return (
+    <div style={{ background: "#FFFFFF", padding: "20px", borderRadius: 4, boxShadow: "var(--shadow-md)" }}>
+      <div className="d-eyebrow d-eyebrow--muted">If mostly work stress — what&apos;s up?</div>
+      <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 12, color: "rgba(19,19,19,.45)", marginBottom: 14 }}>{responses.length} responses · anonymous</div>
+      {options.length === 0 ? (
+        <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 14, color: "rgba(19,19,19,.45)" }}>No responses this cycle.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {options.map(({ label, count }) => (
+            <div key={label} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "center", padding: "6px 0", borderBottom: "1px solid rgba(19,19,19,.06)" }}>
+              <div>
+                <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13.5, fontWeight: 700, marginBottom: 4 }}>{label}</div>
+                <MiniBar value={count} max={maxCount} color="var(--bof-orange)" height={4} />
+              </div>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 700, color: "var(--bof-orange)" }}>{count}×</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SupportPanel({ responses }: { responses: string[] }) {
+  const [teamMessage, setTeamMessage] = useState<string | null>(null);
+  const options = countSupportOptions(responses);
+  const maxCount = options[0]?.count ?? 1;
+
+  useEffect(() => {
+    if (!options.length || teamMessage) return;
+    fetch("/api/coaching", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "action",
+        prompt: `Based on these support needs from our team's pulse survey, write a warm, direct 3-4 sentence message addressed to the full Brains team about how we can show up for each other better this cycle. Speak as "we" — not leadership talking down, but the team talking to itself. Ground it in our value "We Care for Each Other" but make it feel human and specific.\n\nSupport needs selected:\n${options.map((o) => `- ${o.label}: ${o.count} people`).join("\n")}`,
+      }),
+    })
+      .then((r) => r.json())
+      .then((d: { text: string }) => setTeamMessage(d.text ?? null))
+      .catch(() => null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [responses.length]);
 
   return (
-    <div style={{ background: "#FFFFFF", padding: "20px", boxShadow: "0 2px 12px rgba(0,0,0,0.35)" }}>
-      <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>{title}</div>
-      <div style={{ fontSize: 12, color: "#BBBBB5", marginBottom: 16 }}>{responses.length} {responses.length === 1 ? "response" : "responses"} · verbatim · anonymous</div>
-
-      {responses.length === 0 ? (
-        <div style={{ fontSize: 14, color: "#BBBBB5" }}>No responses this cycle.</div>
+    <div style={{ background: "#FFFFFF", padding: "20px", borderRadius: 4, boxShadow: "var(--shadow-md)" }}>
+      <div className="d-eyebrow d-eyebrow--muted">How can we support you better?</div>
+      <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 12, color: "rgba(19,19,19,.45)", marginBottom: 14 }}>{responses.length} responses · anonymous</div>
+      {options.length === 0 ? (
+        <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 14, color: "rgba(19,19,19,.45)" }}>No responses this cycle.</div>
       ) : (
         <>
-          {themes ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-              {themes.slice(0, 5).map((t, i) => (
-                <div key={i} style={{ borderLeft: `3px solid ${accentColor}`, paddingLeft: 12 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: "#131313" }}>{t.theme}</span>
-                    <span style={{ fontSize: 12, color: accentColor, fontWeight: 700 }}>{t.count} responses</span>
-                  </div>
-                  <div style={{ fontSize: 12, color: "#777", marginTop: 2, lineHeight: 1.5 }}>{t.insight}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+            {options.map(({ label, count }) => (
+              <div key={label} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "center", padding: "6px 0", borderBottom: "1px solid rgba(19,19,19,.06)" }}>
+                <div>
+                  <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13.5, fontWeight: 700, marginBottom: 4 }}>{label}</div>
+                  <MiniBar value={count} max={maxCount} color="var(--bof-blue)" height={4} />
                 </div>
-              ))}
+                <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 700, color: "var(--bof-blue)" }}>{count}×</span>
+              </div>
+            ))}
+          </div>
+          {teamMessage ? (
+            <div style={{ padding: "12px 14px", background: "var(--bof-cream)", borderRadius: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/sparks/spark-fill-1.svg" alt="" style={{ width: 11, height: 11 }} />
+                <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--bof-orange)" }}>Team message</span>
+              </div>
+              <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, lineHeight: 1.6, color: "#131313" }}>&ldquo;{teamMessage}&rdquo;</div>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 200, overflowY: "auto", marginBottom: 16 }}>
-              {responses.map((text, i) => (
-                <div key={i} style={{ borderLeft: `3px solid ${accentColor}20`, paddingLeft: 10, fontSize: 12, color: "#555", lineHeight: 1.5 }}>{text}</div>
-              ))}
-            </div>
+            <div style={{ background: "rgba(19,19,19,.04)", padding: "10px 12px", borderRadius: 4, fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.45)" }}>Generating team message…</div>
           )}
-
-          <button
-            onClick={extractThemes}
-            disabled={loading}
-            style={{ fontSize: 11, color: accentColor, background: "transparent", border: `1px solid ${accentColor}`, padding: "5px 12px", cursor: loading ? "default" : "pointer", letterSpacing: "0.05em", textTransform: "uppercase", opacity: loading ? 0.6 : 1, fontFamily: "inherit" }}
-          >
-            {loading ? "EXTRACTING..." : themes ? "RE-EXTRACT THEMES" : "EXTRACT TOP THEMES"}
-          </button>
         </>
       )}
     </div>
   );
 }
 
+// ── Leadership framework ────────────────────────────────────────────────────────
+
 function LeadershipFramework({ stressors, supportNeeds }: { stressors: string[]; supportNeeds: string[] }) {
   const [framework, setFramework] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const generate = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const prompt = `Work stress signals from the team:\n${stressors.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n\nSupport needs expressed:\n${supportNeeds.map((s, i) => `${i + 1}. ${s}`).join("\n")}`;
+      const prompt = `Work stress signals from the team:\n${stressors.map((s, i) => `${i + 1}. ${s}`).join("\n") || "(no data)"}\n\nSupport needs expressed:\n${supportNeeds.map((s, i) => `${i + 1}. ${s}`).join("\n") || "(no data)"}`;
       const res = await fetch("/api/coaching", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "framework", prompt }),
       });
-      const data = await res.json() as { text: string };
+      if (!res.ok) { setError(`API error ${res.status}`); return; }
+      const data = await res.json() as { text?: string; error?: string };
+      if (data.error) { setError(data.error); return; }
       setFramework(data.text ?? null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ background: "#131313", padding: "20px", marginBottom: 8, boxShadow: "0 2px 12px rgba(0,0,0,0.35)" }}>
+    <div style={{ background: "var(--bof-off-black)", padding: "20px", marginBottom: 8, borderRadius: 4 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: framework ? 16 : 0 }}>
         <div>
-          <div style={{ fontSize: 13, color: "#607D85", letterSpacing: "0.06em", textTransform: "uppercase" }}>LEADERSHIP FRAMEWORK</div>
-          <div style={{ fontSize: 12, color: "#444", marginTop: 2 }}>Generated from this cycle&apos;s signals · rooted in markers of excellence</div>
+          <div style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(245,245,245,.55)" }}>Leadership framework</div>
+          <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 12, color: "rgba(245,245,245,.35)", marginTop: 2 }}>Generated from this cycle&apos;s signals · rooted in markers of excellence</div>
         </div>
-        <button
-          onClick={generate}
-          disabled={loading}
-          style={{ background: loading ? "#222" : "#EA5B32", color: "#fff", border: "none", padding: "10px 20px", fontSize: 13, letterSpacing: "0.05em", textTransform: "uppercase", cursor: loading ? "default" : "pointer", fontFamily: "inherit", fontWeight: 700, opacity: loading ? 0.7 : 1 }}
-        >
-          {loading ? "GENERATING..." : framework ? "REGENERATE" : "GENERATE FRAMEWORK"}
+        <button onClick={generate} disabled={loading} style={{ background: loading ? "rgba(255,255,255,.1)" : "var(--bof-orange)", color: "#fff", border: "none", padding: "10px 18px", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", cursor: loading ? "default" : "pointer", borderRadius: 3, opacity: loading ? .7 : 1 }}>
+          {loading ? "Generating…" : framework ? "Regenerate" : "Generate framework"}
         </button>
       </div>
+      {error && <div style={{ marginTop: 12, fontFamily: "var(--font-body-wide)", fontSize: 13, color: "var(--bof-orange)" }}>Error: {error}</div>}
       {framework && (
-        <div style={{ borderTop: "1px solid #222", paddingTop: 16 }}>
+        <div style={{ borderTop: "1px solid rgba(245,245,245,.10)", paddingTop: 16 }}>
           {framework.split("\n").filter(Boolean).map((line, i) => (
-            <div key={i} style={{ fontSize: 14, color: line.match(/^[A-Z].*:$/) ? "#EDC157" : "#C8C8C4", lineHeight: 1.7, fontWeight: line.match(/^[A-Z].*:$/) ? 700 : 400, marginTop: line.match(/^[A-Z].*:$/) ? 14 : 0 }}>
+            <div key={i} style={{ fontFamily: "var(--font-body-wide)", fontSize: 14, color: line.match(/^[A-Z].*:$/) ? "var(--bof-yellow)" : "rgba(245,245,245,.85)", lineHeight: 1.7, fontWeight: line.match(/^[A-Z].*:$/) ? 700 : 400, marginTop: line.match(/^[A-Z].*:$/) ? 14 : 0 }}>
               {line}
             </div>
           ))}
@@ -121,49 +213,35 @@ function LeadershipFramework({ stressors, supportNeeds }: { stressors: string[];
   );
 }
 
-const MARKERS: { name: string; color: string; highCoach: string; midCoach: string; lowCoach: string }[] = [
-  {
-    name: "Pivot with Purpose",
-    color: "#3565E3",
-    highCoach: "Momentum is strong — use it to drive a bold direction shift on a current project.",
-    midCoach: "Prompt the team to name one thing they'd do differently if starting fresh. Small pivots build agility.",
-    lowCoach: "Before pivoting anything externally, stabilise internally — check in 1:1 and remove blockers first.",
-  },
-  {
-    name: "Brave Ideas, Bold Action",
-    color: "#EDC157",
-    highCoach: "High energy — challenge them with a stretch brief or a 'what if we...' provocation this sprint.",
-    midCoach: "Create a low-stakes space for wild ideas — a 15-min 'bad idea brainstorm' can unlock bolder thinking.",
-    lowCoach: "Safety before bravery. Make sure the team feels psychologically safe before pushing for bold moves.",
-  },
-  {
-    name: "Speak Fluent Client",
-    color: "#EEB1D2",
-    highCoach: "The team is client-confident — consider pairing them with a junior member to build that muscle wider.",
-    midCoach: "Run a quick 'client empathy' exercise: what does our client worry about at 2am?",
-    lowCoach: "Focus on listening over presenting — schedule a client listening session with no agenda.",
-  },
-  {
-    name: "Work Out Loud",
-    color: "#2E7354",
-    highCoach: "Great visibility — encourage the team to document a win publicly this week.",
-    midCoach: "Start stand-ups with 'what did you share externally this week?' to normalise working out loud.",
-    lowCoach: "Visibility may feel risky when energy is low. Celebrate imperfect sharing to reduce fear of judgment.",
-  },
-  {
-    name: "Enjoy the Ride",
-    color: "#EA5B32",
-    highCoach: "Joy is high — protect it. Ask what's creating it and do more of that intentionally.",
-    midCoach: "Add one moment of delight to the team's week — a small surprise, a shared laugh, a win worth marking.",
-    lowCoach: "Something is draining the fun. A candid team retro focused on energy, not output, is worth the time.",
-  },
+// ── Team coaching nudges ────────────────────────────────────────────────────────
+
+const MARKERS = [
+  { name: "Pivot with Purpose", color: "var(--bof-blue)",
+    high: "[Team] is moving fast and adapting well — pull them in when you need to shift direction.",
+    mid: "[Team] is finding their footing — share context early so they can flex with you, not react to change.",
+    low: "[Team] may be feeling scattered — give them clear asks and stable timelines right now." },
+  { name: "Brave Ideas, Bold Action", color: "var(--bof-yellow)",
+    high: "[Team] is in bold mode — bring them your half-baked ideas. They'll push them somewhere great.",
+    mid: "[Team] is warming up — ask them 'what would you try if it couldn't fail?' in your next collab.",
+    low: "[Team] needs psychological safety right now — celebrate their ideas loudly, even the small ones." },
+  { name: "Speak Fluent Client", color: "var(--bof-pink)",
+    high: "[Team] is client-sharp — loop them in on client conversations where fresh perspective helps.",
+    mid: "[Team] is steady — share client feedback with them directly so they stay close to the why.",
+    low: "[Team] may feel disconnected — share client stories with them, not just deliverables." },
+  { name: "Work Out Loud", color: "var(--bof-green)",
+    high: "[Team] is sharing openly — follow their lead. Cross-pollination builds better work.",
+    mid: "[Team] is showing up — invite them to your stand-up or share your work-in-progress with them this week.",
+    low: "[Team] may be heads-down — a genuine 'what are you working on?' goes a long way right now." },
+  { name: "Enjoy the Ride", color: "var(--bof-orange)",
+    high: "[Team] is full of energy — plan something fun with them this cycle. Their joy is contagious.",
+    mid: "[Team] is steady — find one moment to mark something together. Recognition doesn't have to be big.",
+    low: "[Team] might need a lift — send a note of appreciation or acknowledge their work publicly this week." },
 ];
 
-function coachingForScore(score: number, markerIdx: number) {
+function nudgeForScore(score: number, team: string, markerIdx: number) {
   const m = MARKERS[markerIdx % MARKERS.length];
-  if (score >= 7.5) return { marker: m.name, color: m.color, idea: m.highCoach };
-  if (score >= 5) return { marker: m.name, color: m.color, idea: m.midCoach };
-  return { marker: m.name, color: m.color, idea: m.lowCoach };
+  const idea = score >= 7.5 ? m.high : score >= 5 ? m.mid : m.low;
+  return { marker: m.name, color: m.color, idea: idea.replace(/\[Team\]/g, team) };
 }
 
 function TeamCoaching({ byTeam, fallbackByTeam }: { byTeam: Record<string, number>; fallbackByTeam: Record<string, number> }) {
@@ -171,23 +249,34 @@ function TeamCoaching({ byTeam, fallbackByTeam }: { byTeam: Record<string, numbe
   if (!teams.length) return null;
 
   return (
-    <div style={{ background: "#FFFFFF", padding: "20px", boxShadow: "0 2px 12px rgba(0,0,0,0.35)", marginBottom: 8 }}>
-      <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>FEELING BY TEAM + COACHING NUDGE</div>
-      <div style={{ fontSize: 13, color: "#BBBBB5", marginBottom: 20 }}>Based on markers of excellence · scores 1–10</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+    <div style={{ background: "#FFFFFF", padding: "20px 22px", marginBottom: 8, borderRadius: 4, boxShadow: "var(--shadow-md)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
+        <div>
+          <div className="d-eyebrow" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/sparks/spark-fill-1.svg" alt="" style={{ width: 14, height: 14, verticalAlign: "-2px" }} />
+            How to show up for each other
+          </div>
+          <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.55)" }}>Team nudges · rooted in markers of excellence</div>
+        </div>
+        <button style={{ background: "transparent", border: "1px solid rgba(19,19,19,.20)", color: "#131313", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "7px 12px", borderRadius: 3, cursor: "pointer" }}>Send pod nudges</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0, borderTop: "1px solid rgba(19,19,19,.10)" }}>
         {teams.map(([team, score], i) => {
-          const coaching = coachingForScore(score, i);
+          const nudge = nudgeForScore(score, team, i);
           return (
-            <div key={team} style={{ borderLeft: `3px solid ${pulseColor(score)}`, paddingLeft: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-                <span style={{ fontSize: 15, fontWeight: 700, color: "#131313" }}>{team}</span>
-                <span style={{ fontSize: 22, fontWeight: 900, color: pulseColor(score) }}>{score}</span>
+            <div key={team} style={{
+              padding: "14px 16px",
+              borderRight: i % 3 !== 2 ? "1px solid rgba(19,19,19,.10)" : "none",
+              borderBottom: Math.floor(i / 3) < Math.floor((teams.length - 1) / 3) ? "1px solid rgba(19,19,19,.10)" : "none",
+              borderTop: `3px solid ${pulseColor(score)}`,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
+                <span style={{ fontFamily: "var(--font-body-wide)", fontWeight: 700, fontSize: 16 }}>{team}</span>
+                <span style={{ fontFamily: "var(--font-body-wide)", fontWeight: 700, fontSize: 18, color: pulseColor(score) }}>{score}</span>
               </div>
-              <MiniBar value={score} max={10} color={pulseColor(score)} height={3} />
-              <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize: 10, color: coaching.color, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4, fontWeight: 700 }}>{coaching.marker}</div>
-                <div style={{ fontSize: 13, color: "#555", lineHeight: 1.55 }}>{coaching.idea}</div>
-              </div>
+              <div style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: nudge.color, marginBottom: 6 }}>{nudge.marker}</div>
+              <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.65)", lineHeight: 1.5 }}>{nudge.idea}</div>
             </div>
           );
         })}
@@ -196,76 +285,7 @@ function TeamCoaching({ byTeam, fallbackByTeam }: { byTeam: Record<string, numbe
   );
 }
 
-const VALUES = [
-  { label: "WE CARE FOR EACH OTHER", key: "care", color: "#EEB1D2" },
-  { label: "WE DO GOOD WORK", key: "work", color: "#2E7354" },
-  { label: "WE LOOK FOR MAGIC", key: "magic", color: "#EDC157" },
-  { label: "WE SPARK JOY", key: "joy", color: "#3565E3" },
-];
-
-interface CycleSummaryProps {
-  feeling: number;
-  gptw: number;
-  balance: number;
-  proudPct?: number;
-  byTeam?: Record<string, number>;
-  participation: number;
-}
-
-function CycleSummary({ feeling, gptw, balance, proudPct, byTeam, participation }: CycleSummaryProps) {
-  const topTeam = byTeam ? Object.entries(byTeam).sort((a, b) => b[1] - a[1])[0] : null;
-  const lowTeam = byTeam ? Object.entries(byTeam).sort((a, b) => a[1] - b[1])[0] : null;
-  const needsAttention = lowTeam && lowTeam[1] < 6;
-
-  const insights: { text: string; color: string }[] = [
-    feeling >= 7
-      ? { text: `Team feeling strong at ${feeling}/10 — energy is high this cycle.`, color: "#2E7354" }
-      : feeling >= 5
-      ? { text: `Team feeling is steady at ${feeling}/10 — worth watching.`, color: "#EDC157" }
-      : { text: `Team feeling at ${feeling}/10 — this cycle needs attention.`, color: "#EA5B32" },
-
-    gptw >= 4.5
-      ? { text: `${gptw}/5 GPTW score — the team genuinely loves working here.`, color: "#2E7354" }
-      : { text: `GPTW sits at ${gptw}/5 — room to grow on culture.`, color: "#EDC157" },
-
-    proudPct !== undefined
-      ? proudPct >= 75
-        ? { text: `${proudPct}% feel proud of their contributions — a strong marker of excellence.`, color: "#2E7354" }
-        : { text: `${proudPct}% feel proud of their work — keep building recognition.`, color: "#EDC157" }
-      : { text: "Contribution pride data loading...", color: "#BBBBB5" },
-
-    balance >= 3.5
-      ? { text: `Work–life balance at ${balance}/5 — people feel supported.`, color: "#2E7354" }
-      : { text: `Balance at ${balance}/5 — worth checking in on capacity.`, color: "#EDC157" },
-
-    topTeam
-      ? { text: `${topTeam[0]} leads team morale at ${topTeam[1]}/10.`, color: "#3565E3" }
-      : { text: `${participation}% participation — great signal of trust.`, color: "#3565E3" },
-
-    needsAttention
-      ? { text: `${lowTeam![0]} at ${lowTeam![1]}/10 — consider a check-in.`, color: "#EA5B32" }
-      : { text: "No teams showing critical morale flags this cycle.", color: "#2E7354" },
-  ];
-
-  return (
-    <div style={{ background: "#131313", padding: "14px 16px", boxShadow: "0 2px 12px rgba(0,0,0,0.35)", height: "100%" }}>
-      <div style={{ fontSize: 11, color: "#607D85", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 10 }}>CYCLE SUMMARY</div>
-      <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
-        {VALUES.map((v) => (
-          <div key={v.key} style={{ fontSize: 9, color: v.color, letterSpacing: "0.05em", textTransform: "uppercase", borderBottom: `1px solid ${v.color}`, paddingBottom: 1 }}>{v.label}</div>
-        ))}
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-        {insights.map((ins, i) => (
-          <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-            <div style={{ width: 4, height: 4, borderRadius: "50%", background: ins.color, flexShrink: 0, marginTop: 5 }} />
-            <span style={{ fontSize: 12, color: "#C8C8C4", lineHeight: 1.5 }}>{ins.text}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+// ── Main view ──────────────────────────────────────────────────────────────────
 
 interface PulseViewProps {
   pulseData?: PulseApiData | null;
@@ -274,7 +294,6 @@ interface PulseViewProps {
 
 export default function PulseView({ pulseData, role }: PulseViewProps) {
   const chartH = 70, chartW = 260, padX = 20;
-
   const trendData = PULSE_DATA.trend.slice(-3);
 
   const pts = (key: "stress" | "fulfillment" | "joy") =>
@@ -284,7 +303,6 @@ export default function PulseView({ pulseData, role }: PulseViewProps) {
       return `${x},${y}`;
     }).join(" ");
 
-  // Live KPI values (fall back to mock)
   const feeling = pulseData?.avgFeeling ?? PULSE_DATA.current.fulfillment;
   const stressSource = pulseData?.avgStressSource ?? PULSE_DATA.current.stress;
   const balance = pulseData?.avgBalance ?? PULSE_DATA.current.balance;
@@ -293,10 +311,10 @@ export default function PulseView({ pulseData, role }: PulseViewProps) {
   const isLive = !!pulseData;
 
   const kpis = [
-    { label: "STRESS", val: feeling, prev: PULSE_DATA.prev.fulfillment, invert: true, max: 10, unit: "/10", note: "1 = low stress · 10 = high stress" },
-    { label: "STRESS SOURCE", val: stressSource, prev: PULSE_DATA.prev.stress, invert: true, max: 10, unit: "/10", note: "1 = mostly work · 10 = mostly life" },
-    { label: "WORK–LIFE BALANCE", val: balance, prev: PULSE_DATA.prev.balance, invert: false, max: 5, unit: "/5" },
-    { label: "GREAT PLACE TO WORK", val: gptw, prev: PULSE_DATA.prev.recognition, invert: false, max: 5, unit: "/5" },
+    { label: "Stress", val: feeling, prev: PULSE_DATA.prev.fulfillment, invert: true, unit: "/10", note: "1 = low stress · 10 = high stress" },
+    { label: "Stress source", val: stressSource, prev: PULSE_DATA.prev.stress, invert: true, unit: "/10", note: "1 = mostly work · 10 = mostly life" },
+    { label: "Work–life balance", val: balance, prev: PULSE_DATA.prev.balance, invert: false, unit: "/5" },
+    { label: "Great place to work", val: gptw, prev: PULSE_DATA.prev.recognition, invert: false, unit: "/5" },
   ];
 
   const TEAM_CANONICAL: Record<string, string> = {
@@ -312,7 +330,6 @@ export default function PulseView({ pulseData, role }: PulseViewProps) {
   };
   const ALLOWED_TEAMS = ["Web Pod", "Strategy", "Projects", "Accounts", "Creative", "Admin", "Pod 1", "Pod 2", "Brand Pod"];
 
-  // Normalize + merge team scores from live data
   const normalizedByTeam: Record<string, number[]> = {};
   Object.entries(pulseData?.byTeam ?? {}).forEach(([raw, score]) => {
     const canonical = TEAM_CANONICAL[raw.toLowerCase().trim()];
@@ -327,100 +344,171 @@ export default function PulseView({ pulseData, role }: PulseViewProps) {
       .map((t) => [t, Math.round((normalizedByTeam[t].reduce((a, b) => a + b, 0) / normalizedByTeam[t].length) * 10) / 10])
   );
 
+  const responded = pulseData?.responseCount ?? PULSE_DATA.participation;
+  const teamSize = pulseData?.teamSize ?? 34;
+
+  const topStressor = countStressOptions(pulseData?.stressors ?? [])[0] ?? null;
+  const topSupport = countSupportOptions(pulseData?.supportNeeds ?? [])[0] ?? null;
+
+  // Build editorial cycle summary
+  const topTeam = Object.entries(cleanByTeam).sort((a, b) => b[1] - a[1])[0];
+  const lowTeam = Object.entries(cleanByTeam).sort((a, b) => a[1] - b[1])[0];
+  const cycleSentence = (() => {
+    if (feeling >= 7) return `The team is feeling strong at ${feeling}/10 — energy is high this cycle.`;
+    if (feeling >= 5) return `The team is feeling steady at ${feeling}/10 — worth watching for shifts.`;
+    return `The team is at ${feeling}/10 this cycle — this needs a check-in.`;
+  })();
+
+  const cycleAddendum = [
+    topTeam && `${topTeam[0]} leads morale at ${topTeam[1]}/10.`,
+    lowTeam && lowTeam[1] < 6 && `${lowTeam[0]} is at ${lowTeam[1]}/10 and could use a check-in.`,
+    topStressor && `Workload is the loudest signal we're hearing back.`,
+  ].filter(Boolean).slice(0, 1).join(" ");
+
   return (
     <div>
+
+      {/* ── Editorial hero — cycle summary ── */}
+      <div style={{ background: "#FFFFFF", padding: "22px 26px", marginBottom: 8, borderRadius: 4, boxShadow: "var(--shadow-md)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 18, alignItems: "flex-start" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/sparks/spark-fill-hero.svg" alt="" style={{ width: 54, height: 48, flexShrink: 0, marginTop: 4 }} />
+          <div>
+            <div className="d-eyebrow d-eyebrow--muted" style={{ marginBottom: 6 }}>Cycle summary</div>
+            <p style={{ fontFamily: "var(--font-display)", fontWeight: 300, fontSize: 24, lineHeight: 1.22, margin: 0, letterSpacing: ".01em", color: "#131313" }}>
+              {cycleSentence}{cycleAddendum ? ` ${cycleAddendum}` : ""}
+            </p>
+            <div style={{ display: "flex", gap: 16, marginTop: 14, flexWrap: "wrap", fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(19,19,19,.45)", fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase" }}>
+              <span>Stress <b style={{ color: "#131313" }}>{feeling}</b></span>
+              <span>GPTW <b style={{ color: "#131313" }}>{gptw}</b></span>
+              {pulseData?.proudPct !== undefined && <span>Proud <b style={{ color: "#131313" }}>{pulseData.proudPct}%</b></span>}
+              <span>Balance <b style={{ color: "#131313" }}>{balance}</b></span>
+              <span>Participation <b style={{ color: "#131313" }}>{Math.round((responded / teamSize) * 100)}%</b></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── How to show up — promoted hero ── */}
+      <TeamCoaching byTeam={cleanByTeam} fallbackByTeam={pulseData ? {} : Object.fromEntries(PULSE_DATA.byValue.map((v) => [v.value, v.score]))} />
+
+      {/* ── KPI tiles ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-        {/* Row 1: KPI cards */}
         {kpis.map((m, i) => {
           const d = delta(m.val, m.prev);
           const good = m.invert ? !d.pos : d.pos;
           return (
-            <div key={i} style={{ background: "#FFFFFF", padding: "20px 16px", boxShadow: "0 2px 12px rgba(0,0,0,0.35)" }}>
-              <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>{m.label}</div>
+            <div key={i} style={{ background: "#FFFFFF", padding: "18px 16px", borderRadius: 4, boxShadow: "var(--shadow-md)" }}>
+              <div className="d-eyebrow d-eyebrow--muted" style={{ marginBottom: 6 }}>{m.label}</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                <div style={{ fontSize: 44, fontWeight: 900, color: "#131313", lineHeight: 1 }}>{m.val}</div>
-                <div style={{ fontSize: 16, color: "#BBBBB5" }}>{m.unit}</div>
+                <span style={{ fontFamily: "var(--font-body-wide)", fontSize: 44, fontWeight: 700, color: "#131313", lineHeight: 1 }}>{m.val}</span>
+                <span style={{ fontFamily: "var(--font-body-wide)", fontSize: 16, color: "rgba(19,19,19,.45)" }}>{m.unit}</span>
               </div>
-              {m.note && <div style={{ fontSize: 12, color: "#BBBBB5", marginTop: 4 }}>{m.note}</div>}
+              {"note" in m && m.note && <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 12, color: "rgba(19,19,19,.45)", marginTop: 4 }}>{m.note as string}</div>}
               {isLive
-                ? <div style={{ fontSize: 13, marginTop: 6, color: "#607D85" }}>{pulseData!.responseCount} responses</div>
-                : <div style={{ fontSize: 14, marginTop: 6, color: good ? "#2E7354" : "#EA5B32" }}>{d.dir} {d.val} vs last month</div>
+                ? <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, marginTop: 6, color: "rgba(19,19,19,.45)" }}>{pulseData!.responseCount} responses</div>
+                : <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, marginTop: 6, color: good ? "var(--bof-green)" : "var(--bof-orange)" }}>{d.dir} {d.val} vs last</div>
               }
             </div>
           );
         })}
+      </div>
 
-        {/* Row 2: Participation (col 1) + Trend (col 2) + Summary (cols 3–4) */}
-        <div style={{ background: "#FFFFFF", padding: "12px 14px", boxShadow: "0 2px 12px rgba(0,0,0,0.35)" }}>
-          <div style={{ fontSize: 11, color: "#7A7A7A", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>PARTICIPATION</div>
-          <div style={{ fontSize: 36, fontWeight: 900, color: participation >= 80 ? "#2E7354" : "#EDC157", lineHeight: 1 }}>{participation}%</div>
-          <div style={{ fontSize: 12, color: "#6B6B6B", marginTop: 6 }}>of team responded</div>
-          <MiniBar value={participation} max={100} color={participation >= 80 ? "#2E7354" : "#EDC157"} height={3} />
+      {/* ── Second row: participation + trend + spotlight ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr 1fr", gap: 8, marginBottom: 8 }}>
+        {/* Participation */}
+        <div style={{ background: "#FFFFFF", padding: "14px 16px", borderRadius: 4, boxShadow: "var(--shadow-md)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <div className="d-eyebrow d-eyebrow--muted" style={{ alignSelf: "flex-start" }}>Participation</div>
+          <ParticipationPie responded={responded} total={teamSize} />
+          <div style={{ fontFamily: "var(--font-body)", fontSize: 10, color: "rgba(19,19,19,.45)", letterSpacing: ".10em", textTransform: "uppercase" }}>Pulse survey</div>
         </div>
 
-        <div style={{ gridColumn: "span 2", background: "#FFFFFF", padding: "12px 14px", boxShadow: "0 2px 12px rgba(0,0,0,0.35)" }}>
-          <div style={{ fontSize: 11, color: "#7A7A7A", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>3-MONTH TREND</div>
-          <svg width="100%" viewBox={`0 0 ${chartW + padX * 2} ${chartH + 32}`}>
-            {/* Y-axis gridlines */}
+        {/* 3-month trend */}
+        <div style={{ background: "#FFFFFF", padding: "14px 16px", borderRadius: 4, boxShadow: "var(--shadow-md)" }}>
+          <div className="d-eyebrow d-eyebrow--muted" style={{ marginBottom: 4 }}>3-month trend</div>
+          <svg width="100%" viewBox={`0 0 ${chartW + padX * 2} ${chartH + 24}`}>
             {[2, 4, 6, 8, 10].map((v) => {
               const y = chartH - (v / 10) * chartH;
               return (
                 <g key={v}>
-                  <line x1={padX} x2={padX + chartW} y1={y} y2={y} stroke="#E8E8E5" strokeWidth={0.5} />
-                  <text x={padX - 4} y={y + 3} fill="#BBBBB5" fontSize={7} textAnchor="end" fontFamily="inherit">{v}</text>
+                  <line x1={padX} x2={padX + chartW} y1={y} y2={y} stroke="rgba(19,19,19,.06)" strokeWidth={0.5} />
+                  <text x={padX - 4} y={y + 3} fill="rgba(19,19,19,.35)" fontSize={6} textAnchor="end" fontFamily="inherit">{v}</text>
                 </g>
               );
             })}
-            {/* X-axis baseline */}
-            <line x1={padX} x2={padX + chartW} y1={chartH} y2={chartH} stroke="#D8D8D4" strokeWidth={1} />
-            <polyline points={pts("stress")} fill="none" stroke="#EA5B32" strokeWidth={2} strokeLinejoin="round" />
+            <line x1={padX} x2={padX + chartW} y1={chartH} y2={chartH} stroke="rgba(19,19,19,.15)" strokeWidth={1} />
+            <polyline points={pts("stress")} fill="none" stroke="var(--bof-orange)" strokeWidth={2} strokeLinejoin="round" />
             {trendData.map((d, i) => {
               const x = padX + (i / (trendData.length - 1)) * chartW;
               return (
                 <g key={i}>
-                  <line x1={x} x2={x} y1={chartH} y2={chartH + 4} stroke="#D8D8D4" strokeWidth={1} />
-                  <text x={x} y={chartH + 14} fill="#555" fontSize={9} textAnchor="middle" fontFamily="inherit">{d.month}</text>
+                  <line x1={x} x2={x} y1={chartH} y2={chartH + 3} stroke="rgba(19,19,19,.15)" strokeWidth={1} />
+                  <text x={x} y={chartH + 11} fill="rgba(19,19,19,.45)" fontSize={7} textAnchor="middle" fontFamily="inherit">{d.month}</text>
                 </g>
               );
             })}
-            <text x={padX + chartW / 2} y={chartH + 28} fill="#BBBBB5" fontSize={8} textAnchor="middle" fontFamily="inherit" letterSpacing="0.05em">SCALE 1–10</text>
           </svg>
-          <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <div style={{ width: 16, height: 2, background: "#EA5B32", borderRadius: 1 }} />
-              <span style={{ fontSize: 11, color: "#7A7A7A", textTransform: "uppercase", letterSpacing: "0.04em" }}>Stress</span>
-            </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+            <div style={{ width: 14, height: 2, background: "var(--bof-orange)", borderRadius: 1 }} />
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 10, color: "rgba(19,19,19,.45)", textTransform: "uppercase", letterSpacing: ".08em" }}>Stress</span>
           </div>
         </div>
 
-        <div style={{ gridColumn: "span 1" }}>
-          <CycleSummary feeling={feeling} gptw={gptw} balance={balance} proudPct={pulseData?.proudPct} byTeam={cleanByTeam} participation={participation} />
+        {/* Spotlight */}
+        <div style={{ background: "#FFFFFF", padding: "16px", borderRadius: 4, boxShadow: "var(--shadow-md)", display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <div className="d-eyebrow d-eyebrow--muted">If mostly work stress — what&apos;s up?</div>
+            {topStressor ? (
+              <>
+                <div style={{ fontFamily: "var(--font-display)", fontWeight: 300, fontSize: 18, color: "var(--bof-orange)", lineHeight: 1.2, marginBottom: 4, marginTop: 4 }}>{topStressor.label}</div>
+                <div style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(19,19,19,.45)" }}>{topStressor.count} responses flagged this</div>
+              </>
+            ) : (
+              <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.45)", marginTop: 4 }}>No data yet</div>
+            )}
+          </div>
+          <div style={{ borderTop: "1px solid rgba(19,19,19,.08)", paddingTop: 14 }}>
+            <div className="d-eyebrow d-eyebrow--muted">#1 support need</div>
+            {topSupport ? (
+              <>
+                <div style={{ fontFamily: "var(--font-display)", fontWeight: 300, fontSize: 18, color: "var(--bof-blue)", lineHeight: 1.2, marginBottom: 4, marginTop: 4 }}>{topSupport.label}</div>
+                <div style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(19,19,19,.45)" }}>{topSupport.count} responses flagged this</div>
+              </>
+            ) : (
+              <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.45)", marginTop: 4 }}>No data yet</div>
+            )}
+          </div>
         </div>
       </div>
 
-      {(role === "coach" || role === "leadership") && (
-        <TeamCoaching byTeam={cleanByTeam} fallbackByTeam={pulseData ? {} : Object.fromEntries(PULSE_DATA.byValue.map((v) => [v.value, v.score]))} />
-      )}
+      {/* ── Visibility strip ── */}
+      <div style={{ background: "var(--bof-off-black)", padding: "14px 18px", marginBottom: 8, borderRadius: 4 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div className="d-eyebrow d-eyebrow--inverse" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/sparks/spark-fill-2.svg" alt="" style={{ width: 12, height: 12, filter: "invert(1)", opacity: .7 }} />
+            What each role sees
+          </div>
+          <div style={{ display: "flex", gap: 20, fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(245,245,245,.45)", fontWeight: 700, letterSpacing: ".10em", textTransform: "uppercase", flexWrap: "wrap" }}>
+            <span><span style={{ color: "rgba(245,245,245,.85)" }}>Everyone:</span> aggregate scores · pod nudges</span>
+            <span><span style={{ color: "rgba(245,245,245,.85)" }}>+ Coaches:</span> flagged ICs · 1:1 prompts</span>
+            <span><span style={{ color: "rgba(245,245,245,.85)" }}>+ Leadership:</span> per-person stress · watchlist</span>
+          </div>
+        </div>
+      </div>
 
-      {(role === "coach" || role === "leadership") && (pulseData?.stressors?.length || pulseData?.supportNeeds?.length) && (
+      {/* ── Expanded data (coach/leadership gated) ── */}
+      {(role === "coach" || role === "leadership") && (pulseData?.stressors?.length || pulseData?.supportNeeds?.length) ? (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-            <OpenTextPanel
-              title="IF MOSTLY WORK STRESS — WHAT'S UP?"
-              responses={pulseData?.stressors ?? []}
-              accentColor="#EA5B32"
-            />
-            <OpenTextPanel
-              title="HOW CAN WE SUPPORT YOU BETTER?"
-              responses={pulseData?.supportNeeds ?? []}
-              accentColor="#3565E3"
-            />
+            <StressorsPanel responses={pulseData?.stressors ?? []} />
+            <SupportPanel responses={pulseData?.supportNeeds ?? []} />
           </div>
           {role === "leadership" && (
             <LeadershipFramework stressors={pulseData?.stressors ?? []} supportNeeds={pulseData?.supportNeeds ?? []} />
           )}
         </>
-      )}
+      ) : null}
     </div>
   );
 }

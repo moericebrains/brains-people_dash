@@ -2,15 +2,81 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   BRAINS ON FIRE — Design Tokens
+   ============================================================ */
+
+:root {
+  /* Primary brand */
+  --bof-off-black:    #131313;
+  --bof-off-white:    #F5F5F5;
+  --bof-black:        #000000;
+  --bof-white:        #FFFFFF;
+
+  /* Secondary palette */
+  --bof-green:        #2E7354;
+  --bof-blue:         #3565E3;
+  --bof-orange:       #EA5B32;
+  --bof-yellow:       #EDC157;
+  --bof-pink:         #EEB1D2;
+  --bof-light-blue:   #C0DFEC;
+
+  /* Deeper variants */
+  --bof-blue-deep:    #3465D9;
+  --bof-orange-deep:  #E05B33;
+
+  /* Paper */
+  --bof-cream:        #F9F7E9;
+  --bof-parchment:    #EAE1D8;
+
+  /* Semantic */
+  --bg:               var(--bof-off-white);
+  --bg-alt:           var(--bof-cream);
+  --bg-inverse:       var(--bof-off-black);
+  --fg:               var(--bof-off-black);
+  --fg-muted:         #4a4a4a;
+  --fg-subtle:        #7a7a7a;
+  --fg-inverse:       var(--bof-off-white);
+  --accent:           var(--bof-green);
+  --accent-2:         var(--bof-orange);
+  --accent-3:         var(--bof-blue);
+  --accent-4:         var(--bof-yellow);
+  --border:           rgba(19,19,19,0.12);
+  --border-strong:    rgba(19,19,19,0.24);
+  --border-inverse:   rgba(245,245,245,0.14);
+
+  /* Spacing */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  24px;
+  --space-6:  32px;
+
+  /* Radii */
+  --radius-sm:  4px;
+  --radius-md:  8px;
+  --radius-lg:  14px;
+  --radius-pill: 999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(19,19,19,0.06), 0 1px 1px rgba(19,19,19,0.04);
+  --shadow-md: 0 2px 6px rgba(19,19,19,0.08), 0 4px 16px rgba(19,19,19,0.05);
+  --shadow-lg: 0 8px 24px rgba(19,19,19,0.10), 0 2px 4px rgba(19,19,19,0.05);
+
+  /* Type families — Next.js injects --font-unbounded / --font-barlow / --font-roboto */
+  --font-display:    var(--font-unbounded, "Unbounded"), serif;
+  --font-body:       var(--font-barlow, "Barlow Condensed"), "Roboto Condensed", system-ui, sans-serif;
+  --font-body-wide:  var(--font-roboto, "Roboto Condensed"), system-ui, sans-serif;
+  --font-mono:       ui-monospace, monospace;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
 }
 
 ::-webkit-scrollbar { width: 4px; background: #111; }
 ::-webkit-scrollbar-thumb { background: #BBBBB5; }
-
-button { font-family: 'DM Sans', sans-serif; }
-input  { font-family: 'DM Sans', sans-serif; }
 
 /* ── Flower animations ──────────────────────────────────────── */
 
@@ -24,3 +90,75 @@ input  { font-family: 'DM Sans', sans-serif; }
   transform-origin: 50% 100%;
   display: inline-block;
 }
+
+/* ── Drawer slide-in ──────────────────────────────────────────── */
+
+@keyframes drawerSlideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+.drawer-enter {
+  animation: drawerSlideIn 0.28s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+/* ── Utility classes ────────────────────────────────────────── */
+
+.d-eyebrow {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--bof-off-black);
+  margin-bottom: 8px;
+}
+.d-eyebrow--muted { color: rgba(19,19,19,.55); }
+.d-eyebrow--inverse { color: var(--bof-off-white); }
+.d-eyebrow--inverse-muted { color: rgba(245,245,245,.55); }
+
+.d-num {
+  font-family: var(--font-body-wide);
+  font-weight: 700;
+  font-size: 40px;
+  line-height: 1;
+}
+.d-num--green { color: var(--bof-green); }
+.d-num--orange { color: var(--bof-orange); }
+.d-num--blue { color: var(--bof-blue); }
+
+.marker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 999px;
+}
+.marker--care    { background: var(--bof-pink);    color: var(--bof-off-black); }
+.marker--good    { background: var(--bof-green);   color: var(--bof-off-white); }
+.marker--magic   { background: var(--bof-yellow);  color: var(--bof-off-black); }
+.marker--joy     { background: var(--bof-orange);  color: var(--bof-off-white); }
+.marker--ghost   { background: rgba(19,19,19,.06); color: var(--bof-off-black); }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 3px;
+}
+.pill--green   { background: var(--bof-green);  color: var(--bof-off-white); }
+.pill--orange  { background: var(--bof-orange); color: var(--bof-off-white); }
+.pill--blue    { background: var(--bof-blue);   color: var(--bof-off-white); }
+.pill--yellow  { background: var(--bof-yellow); color: var(--bof-off-black); }
+.pill--pink    { background: var(--bof-pink);   color: var(--bof-off-black); }
+.pill--outline { border: 1px solid rgba(19,19,19,.20); color: var(--bof-off-black); }
+.pill--ghost   { background: rgba(19,19,19,.06); color: var(--bof-off-black); }

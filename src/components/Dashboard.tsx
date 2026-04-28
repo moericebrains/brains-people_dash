@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Person, Role, PulseApiData, OnaApiData } from "@/lib/types";
-import { PEOPLE, PULSE_DATA, ONA_DATA } from "@/lib/constants";
+import type { Person, Role, PulseApiData, OnaApiData, HarvestData } from "@/lib/types";
+import { PEOPLE, PULSE_DATA, ONA_DATA, STRESS_DATA } from "@/lib/constants";
 import PersonModal from "./PersonModal";
 import PulseView from "./views/PulseView";
 import SatisfactionView from "./views/SatisfactionView";
@@ -17,11 +17,11 @@ const PINS = {
 };
 
 const NAV = [
-  { id: "pulse", label: "PULSE" },
+  { id: "pulse", label: "STRESS" },
   { id: "satisfaction", label: "SATISFACTION" },
-  { id: "stress", label: "STRESS" },
+  { id: "stress", label: "UTILIZATION" },
   { id: "actions", label: "ACTIONS" },
-  { id: "teamdna", label: "TEAM DNA" },
+  { id: "teamdna", label: "PERSONALITY" },
   { id: "directory", label: "DIRECTORY" },
 ];
 
@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [pulseApi, setPulseApi] = useState<PulseApiData | null>(null);
   const [onaApi, setOnaApi] = useState<OnaApiData | null>(null);
+  const [harvestApi, setHarvestApi] = useState<HarvestData | null>(null);
   const [people, setPeople] = useState<Person[]>(PEOPLE);
 
   useEffect(() => {
@@ -57,6 +58,19 @@ export default function Dashboard() {
         if (d.people?.length) setPeople(d.people);
       })
       .catch(console.error);
+
+    fetch("/api/harvest")
+      .then((r) => r.json())
+      .then((d: HarvestData) => setHarvestApi(d))
+      .catch(console.error);
+
+    // Listen for prev/next navigation from PersonModal drawer
+    const handleSelectPerson = (e: Event) => {
+      const custom = e as CustomEvent<Person>;
+      setSelectedPerson(custom.detail);
+    };
+    window.addEventListener("peopledash:selectperson", handleSelectPerson);
+    return () => window.removeEventListener("peopledash:selectperson", handleSelectPerson);
   }, []);
 
   // Derive FLOWERS list from live pulse flowerCounts, fall back to PULSE_DATA mock
@@ -70,7 +84,11 @@ export default function Dashboard() {
   const onaAlerts = onaApi?.alerts ?? ONA_DATA.alerts;
 
   const switchRole = (r: Role) => {
-    if (r === "ic") { setRole("ic"); return; }
+    if (r === "ic") {
+      setRole("ic");
+      if (view === "stress") setView("pulse");
+      return;
+    }
     setPendingRole(r as "leadership" | "coach");
     setPin("");
     setAuthOpen(true);
@@ -80,6 +98,7 @@ export default function Dashboard() {
     if (pendingRole && pin === PINS[pendingRole]) {
       setRole(pendingRole);
       setAuthOpen(false);
+      if (pendingRole === "coach" && view === "stress") setView("pulse");
     } else {
       setPin("WRONG PIN");
       setTimeout(() => setPin(""), 1000);
@@ -87,40 +106,46 @@ export default function Dashboard() {
   };
 
   return (
-    <div style={{ fontFamily: "'DM Sans',sans-serif", background: "#131313", minHeight: "100vh", color: "#131313" }}>
+    <div style={{ background: "var(--bof-off-black, #131313)", minHeight: "100vh", color: "#131313" }}>
 
       {/* Auth modal */}
       {authOpen && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#FFFFFF", padding: "40px", width: 320, borderTop: "3px solid #FF4500" }}>
-            <div style={{ fontSize: 15, color: "#607D85", letterSpacing: "0.05em", marginBottom: 8 }}>ACCESS REQUIRED</div>
-            <div style={{ fontSize: 32, fontWeight: 900, color: "#131313", marginBottom: 24 }}>{pendingRole?.toUpperCase()} VIEW</div>
+          <div style={{ background: "#FFFFFF", padding: "40px", width: 320, borderTop: "3px solid var(--bof-orange, #EA5B32)" }}>
+            <div style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(19,19,19,.55)", letterSpacing: ".14em", textTransform: "uppercase", marginBottom: 8 }}>Access required</div>
+            <div style={{ fontFamily: "var(--font-display)", fontWeight: 300, fontSize: 32, color: "#131313", marginBottom: 24, letterSpacing: ".01em" }}>{pendingRole} view</div>
             <input
               type="password" value={pin}
               onChange={(e) => setPin(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submitPin()}
-              placeholder="ENTER PIN" maxLength={4}
-              style={{ background: "#131313", border: "1px solid #333", color: pin === "WRONG PIN" ? "#EA5B32" : "#fff", fontSize: 24, letterSpacing: "0.3em", padding: "12px 16px", width: "100%", outline: "none", fontFamily: "inherit", marginBottom: 16 }}
+              placeholder="Enter PIN" maxLength={4}
+              style={{ background: "#131313", border: "1px solid #333", color: pin === "WRONG PIN" ? "var(--bof-orange)" : "#fff", fontSize: 24, letterSpacing: "0.3em", padding: "12px 16px", width: "100%", outline: "none", fontFamily: "inherit", marginBottom: 16 }}
             />
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={submitPin} style={{ flex: 1, background: "#EA5B32", color: "#131313", border: "none", padding: "12px", fontSize: 15, letterSpacing: "0.05em", cursor: "pointer", fontWeight: 700 }}>ENTER</button>
-              <button onClick={() => setAuthOpen(false)} style={{ flex: 1, background: "transparent", color: "#666", border: "1px solid #444", padding: "12px", fontSize: 15, letterSpacing: "0.05em", cursor: "pointer" }}>CANCEL</button>
+              <button onClick={submitPin} style={{ flex: 1, background: "var(--bof-orange, #EA5B32)", color: "#fff", border: "none", padding: "12px", fontSize: 13, letterSpacing: ".14em", textTransform: "uppercase", cursor: "pointer", fontWeight: 700, fontFamily: "var(--font-body)" }}>Enter</button>
+              <button onClick={() => setAuthOpen(false)} style={{ flex: 1, background: "transparent", color: "#666", border: "1px solid #444", padding: "12px", fontSize: 13, letterSpacing: ".14em", textTransform: "uppercase", cursor: "pointer", fontFamily: "var(--font-body)" }}>Cancel</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Person modal */}
-      {selectedPerson && <PersonModal person={selectedPerson} onClose={() => setSelectedPerson(null)} role={role} />}
+      {/* Person drawer */}
+      {selectedPerson && (
+        <PersonModal
+          person={selectedPerson}
+          onClose={() => setSelectedPerson(null)}
+          role={role}
+          people={people}
+        />
+      )}
 
       {/* Header */}
-      <header style={{ borderBottom: "1px solid #1a1a1a", padding: "0 24px", display: "flex", alignItems: "stretch", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 0" }}>
-          {/* Logo — drop brains-logo.png into /public/ to activate */}
+      <header style={{ borderBottom: "1px solid rgba(245,245,245,.10)", padding: "0 24px", display: "flex", alignItems: "stretch", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 0" }}>
           <img
             src="/brains-logo.png"
             alt="Brains"
-            style={{ height: 26, filter: "brightness(0) invert(1)", display: "block" }}
+            style={{ height: 22, filter: "brightness(0) invert(1)", display: "block" }}
             onError={(e) => {
               const el = e.currentTarget as HTMLImageElement;
               el.style.display = "none";
@@ -128,59 +153,88 @@ export default function Dashboard() {
               if (next) next.style.display = "block";
             }}
           />
-          {/* Fallback SVG text (hidden when logo loads) */}
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 36" style={{ height: 30, display: "none" }}>
-            <text x="0" y="28" fontFamily="DM Sans,sans-serif" fontWeight="900" fontSize="30" fill="#C0DFEC" letterSpacing="-1">BRAINS</text>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 36" style={{ height: 26, display: "none" }}>
+            <text x="0" y="28" fontFamily="sans-serif" fontWeight="700" fontSize="26" fill="#C0DFEC" letterSpacing="-1">BRAINS</text>
           </svg>
-          <div style={{ width: 1, height: 20, background: "#333" }} />
-          <div style={{ fontSize: 15, color: "#8BBBCC", letterSpacing: "0.05em" }}>CULTURE DASHBOARD</div>
-          <div style={{ fontSize: 13, color: "#607D85", letterSpacing: "0.04em" }}>— APR 2026</div>
+          <div style={{ width: 1, height: 18, background: "rgba(245,245,245,.15)" }} />
+          <div style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 700, color: "rgba(245,245,245,.55)", letterSpacing: ".14em", textTransform: "uppercase" }}>People Dashboard</div>
+          <div style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "rgba(245,245,245,.35)", letterSpacing: ".08em" }}>— Apr 2026</div>
         </div>
-        <div style={{ display: "flex", gap: 1, alignItems: "stretch" }}>
+        <div style={{ display: "flex", alignItems: "stretch" }}>
           {ROLES.map((r) => (
             <button key={r.id} onClick={() => switchRole(r.id as Role)} style={{
-              background: role === r.id ? "#EA5B32" : "transparent",
-              color: role === r.id ? "#fff" : "#444",
-              border: "none", padding: "0 16px", fontSize: 13, letterSpacing: "0.05em", cursor: "pointer",
-              fontWeight: role === r.id ? 800 : 400, transition: "all 0.2s", fontFamily: "inherit",
+              background: role === r.id ? "var(--bof-orange, #EA5B32)" : "transparent",
+              color: role === r.id ? "#fff" : "rgba(245,245,245,.45)",
+              border: "none", padding: "0 16px",
+              fontFamily: "var(--font-body)", fontSize: 12, letterSpacing: ".14em", textTransform: "uppercase",
+              cursor: "pointer", fontWeight: 700, transition: "all 0.2s",
+              borderRadius: role === r.id ? 4 : 0,
+              margin: "8px 2px",
             }}>{r.label}</button>
           ))}
         </div>
       </header>
 
+      {/* Visibility strip */}
+      <div style={{ background: "rgba(255,255,255,.04)", borderBottom: "1px solid rgba(245,245,245,.08)", padding: "8px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(245,245,245,.55)", display: "flex", alignItems: "center", gap: 8 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/sparks/spark-fill-2.svg" alt="" style={{ width: 11, height: 11, filter: "invert(1)", opacity: .5 }} />
+          Viewing as {role === "ic" ? "Everyone" : role === "coach" ? "Coach" : "Leadership"}
+        </div>
+        <div style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(245,245,245,.35)", letterSpacing: ".10em", textTransform: "uppercase" }}>
+          {role === "ic" && "Aggregates only — no individuals named"}
+          {role === "coach" && "Your coachees + flagged team members"}
+          {role === "leadership" && "Full org view + watchlist"}
+        </div>
+      </div>
+
       {/* Nav */}
-      <nav style={{ borderBottom: "1px solid #1a1a1a", padding: "0 24px", display: "flex" }}>
-        {/* Home button */}
+      <nav style={{ borderBottom: "1px solid rgba(245,245,245,.10)", padding: "0 24px", display: "flex" }}>
         <button
           onClick={() => setView("pulse")}
-          style={{ background: "transparent", border: "none", color: "#444", padding: "14px 16px", fontSize: 18, cursor: "pointer", fontFamily: "inherit", marginBottom: -1, lineHeight: 1 }}
+          style={{ background: "transparent", border: "none", color: "rgba(245,245,245,.45)", padding: "14px 14px 12px", fontSize: 16, cursor: "pointer", fontFamily: "inherit", marginBottom: -1, lineHeight: 1 }}
           title="Home"
         >⌂</button>
-        {NAV.map((n) => (
+        {NAV.filter((n) => n.id !== "stress" || role === "leadership").map((n) => (
           <button key={n.id} onClick={() => setView(n.id)} style={{
             background: "transparent", border: "none",
-            borderBottom: view === n.id ? "2px solid #FF4500" : "2px solid transparent",
-            color: view === n.id ? "#fff" : "#444",
-            padding: "14px 20px", fontSize: 15, letterSpacing: "0.05em",
-            cursor: "pointer", fontWeight: view === n.id ? 800 : 400, transition: "all 0.15s",
-            fontFamily: "inherit", marginBottom: -1,
+            borderBottom: view === n.id ? "2px solid var(--bof-orange, #EA5B32)" : "2px solid transparent",
+            color: view === n.id ? "#fff" : "rgba(245,245,245,.45)",
+            padding: "14px 18px 12px",
+            fontFamily: "var(--font-body)", fontSize: 12, letterSpacing: ".14em", textTransform: "uppercase",
+            cursor: "pointer", fontWeight: 700, transition: "all 0.15s",
+            marginBottom: -1,
           }}>{n.label}</button>
         ))}
       </nav>
 
+      {/* Meta bar */}
+      <div style={{ padding: "8px 24px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(245,245,245,.35)" }}>
+        <span>
+          <span style={{ color: "rgba(245,245,245,.7)" }}>Pulse cycle</span>
+          {pulseApi?.dateRange
+            ? ` · ${pulseApi.dateRange.from} — ${pulseApi.dateRange.to}`
+            : " · Current cycle"}
+        </span>
+        <span>
+          {pulseApi ? `${pulseApi.responseCount} of ${pulseApi.teamSize ?? 34} responded` : "34 of 34 responded"}
+        </span>
+      </div>
+
       {/* Content */}
-      <main style={{ padding: "16px 16px 0" }}>
+      <main style={{ padding: "0 16px 16px" }}>
         {view === "pulse"        && <PulseView pulseData={pulseApi} role={role} />}
         {view === "satisfaction" && <SatisfactionView pulseData={pulseApi} onaData={onaApi} flowers={liveFlowers.length ? liveFlowers : undefined} />}
-        {view === "stress"       && <StressView onaNodes={onaNodes} onaAlerts={onaAlerts} />}
-        {view === "actions"      && <ActionsView role={role} onSelectPerson={setSelectedPerson} />}
+        {view === "stress"       && <StressView onaNodes={onaNodes} onaAlerts={onaAlerts} harvestData={harvestApi ?? { source: "mock", range: "current", orgAvg: STRESS_DATA.orgAvg, teams: STRESS_DATA.teams.map((t) => ({ ...t, trend: t.trend as "up" | "down" | "stable" })) }} role={role} dateRange={pulseApi?.dateRange} />}
+        {view === "actions"      && <ActionsView role={role} onSelectPerson={setSelectedPerson} dateRange={pulseApi?.dateRange} />}
         {view === "teamdna"      && <TeamDNAView onSelectPerson={setSelectedPerson} people={people} />}
         {view === "directory"    && <DirectoryView role={role} onSelectPerson={setSelectedPerson} people={people} />}
       </main>
 
-      <footer style={{ padding: "20px 24px", borderTop: "1px solid #1a1a1a", display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 1 }}>
-        <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "0.04em" }}>DATA: RIPPLING (PULSE + ONA) · HARVEST TIME TRACKING · LAST SYNC: TODAY</div>
-        <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "0.04em" }}>WE CARE FOR EACH OTHER · WE DO GOOD WORK · WE LOOK FOR MAGIC · WE SPARK JOY</div>
+      <footer style={{ padding: "14px 24px", borderTop: "1px solid rgba(245,245,245,.10)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ fontFamily: "var(--font-body)", fontSize: 10, color: "rgba(245,245,245,.35)", letterSpacing: ".12em", textTransform: "uppercase" }}>Data: Rippling (pulse + ONA) · Harvest time tracking · Last sync: today</div>
+        <div style={{ fontFamily: "var(--font-body)", fontSize: 10, color: "rgba(245,245,245,.35)", letterSpacing: ".12em", textTransform: "uppercase" }}>We care for each other · We do good work · We look for magic · We spark joy</div>
       </footer>
     </div>
   );

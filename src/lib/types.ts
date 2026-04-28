@@ -72,6 +72,8 @@ export interface PulseApiData {
   supportNeeds: string[];
   byTeam: Record<string, number>;
   responseCount: number;
+  teamSize: number;
+  dateRange: { from: string; to: string } | null;
 }
 
 export interface OnaApiData {
@@ -79,4 +81,22 @@ export interface OnaApiData {
   infoFlowEase: number;
   responseCount: number;
   alerts: Array<{ type: string; message: string }>;
+}
+
+export interface HarvestTeam {
+  name: string;
+  members: number;
+  utilization: number;
+  billable: number;
+  burnoutRisk: boolean;
+  trend: "up" | "down" | "stable";
+  individuals?: Array<{ name: string; utilization: number; billable: number }>;
+}
+
+export interface HarvestData {
+  source: "live" | "mock";
+  range: string;
+  dateRange?: { from: string; to: string };
+  orgAvg: { utilization: number; billable: number };
+  teams: HarvestTeam[];
 }

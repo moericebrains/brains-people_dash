@@ -174,7 +174,6 @@ export const STRESS_DATA = {
     { name: "Strategy", utilization: 76, billable: 79, trend: "up", members: 5, burnoutRisk: false },
     { name: "Creative", utilization: 68, billable: 72, trend: "stable", members: 8, burnoutRisk: false },
     { name: "Project Mgmt", utilization: 84, billable: 88, trend: "up", members: 4, burnoutRisk: true },
-    { name: "Operations", utilization: 52, billable: 54, trend: "down", members: 3, burnoutRisk: false },
   ],
 };
 

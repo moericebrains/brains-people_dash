@@ -45,26 +45,32 @@ export async function POST(req: NextRequest) {
 
   const actionSuffix = personContext ? `\n\nWhere relevant, weave in this person's profile: ${personContext}` : "";
 
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: type === "themes" ? 400 : type === "framework" ? 800 : 600,
-    system: [
-      { type: "text", text: BRAINS_CONTEXT, cache_control: { type: "ephemeral" } },
-      { type: "text", text: instructions + (type === "person" ? actionSuffix : "") },
-    ],
-    messages: [{ role: "user", content: prompt }],
-  });
+  try {
+    const message = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: type === "themes" ? 400 : type === "framework" ? 800 : 600,
+      system: [
+        { type: "text", text: BRAINS_CONTEXT, cache_control: { type: "ephemeral" } },
+        { type: "text", text: instructions + (type === "person" ? actionSuffix : "") },
+      ],
+      messages: [{ role: "user", content: prompt }],
+    });
 
-  const text = message.content.find((b) => b.type === "text")?.text ?? "";
+    const text = message.content.find((b) => b.type === "text")?.text ?? "";
 
-  if (type === "themes") {
-    try {
-      const themes = JSON.parse(text);
-      return NextResponse.json({ themes });
-    } catch {
-      return NextResponse.json({ themes: [] });
+    if (type === "themes") {
+      try {
+        const themes = JSON.parse(text);
+        return NextResponse.json({ themes });
+      } catch {
+        return NextResponse.json({ themes: [] });
+      }
     }
-  }
 
-  return NextResponse.json({ text });
+    return NextResponse.json({ text });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    console.error("Anthropic API error:", msg);
+    return NextResponse.json({ error: `Anthropic API error: ${msg}` }, { status: 502 });
+  }
 }

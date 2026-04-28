@@ -2,35 +2,74 @@
 
 import { useState } from "react";
 import { ENNEAGRAM_LABELS, STRENGTHS_DOMAINS } from "@/lib/constants";
-import { pulseColor, stressColor, mbtiGroup, mbtiColor } from "@/lib/utils";
+import { mbtiGroup, mbtiColor } from "@/lib/utils";
 import type { Person, Role } from "@/lib/types";
-import Tag from "./ui/Tag";
-import ScoreRing from "./ui/ScoreRing";
 
 interface PersonModalProps {
   person: Person;
   onClose: () => void;
   role: Role;
+  people?: Person[];
 }
 
-export default function PersonModal({ person, onClose, role }: PersonModalProps) {
+const initials = (name: string) => {
+  const parts = name.trim().split(" ");
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
+};
+
+function Field({ label, value }: { label: string; value?: string | string[] }) {
+  if (!value || (Array.isArray(value) && value.length === 0)) return null;
+  const display = Array.isArray(value) ? value.join(" · ") : value;
+  return (
+    <div style={{ paddingBottom: 10, borderBottom: "1px solid rgba(19,19,19,.06)", marginBottom: 10 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".10em", textTransform: "uppercase", color: "rgba(19,19,19,.55)", marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 13.5, color: "#333", lineHeight: 1.5 }}>{display}</div>
+    </div>
+  );
+}
+
+export default function PersonModal({ person, onClose, role, people = [] }: PersonModalProps) {
   const [narrative, setNarrative] = useState("");
+  const [narrativeError, setNarrativeError] = useState("");
   const [loading, setLoading] = useState(false);
   const canSeeSensitive = role === "leadership" || role === "coach";
-  const hue = person.enneagram * 40;
+
+  const currentIndex = people.findIndex((p) => p.id === person.id);
+
+  const navigateTo = (dir: -1 | 1) => {
+    if (!people.length) return;
+    const nextIndex = (currentIndex + dir + people.length) % people.length;
+    // We need to call onClose and then reopen — but we don't have that mechanism.
+    // Instead we use window event. For now: we'll refresh by closing then dispatching.
+    // Simple approach: navigate through window.location won't work. Let's just
+    // find a way to update the selected person from here.
+    // We'll use a custom event that Dashboard listens to.
+    window.dispatchEvent(new CustomEvent("peopledash:selectperson", { detail: people[nextIndex] }));
+  };
 
   const generateNarrative = async () => {
     setLoading(true);
+    setNarrativeError("");
     try {
+      const richContext = [
+        person.superpower && `Natural strengths: ${person.superpower}`,
+        person.working_on && `Working on: ${person.working_on}`,
+        person.growth_areas && `Growth areas: ${person.growth_areas}`,
+        person.burnout_triggers && `Burnout triggers: ${person.burnout_triggers}`,
+        person.burnout_support && `Burnout support: ${person.burnout_support}`,
+        person.feedback_pref && `Feedback preference: ${person.feedback_pref}`,
+        person.intro_extro && `Intro/extro: ${person.intro_extro}`,
+      ].filter(Boolean).join("\n");
+
       const prompt = `Name: ${person.name}
 Role: ${person.role}
 Pod: ${person.pod}
 StrengthsFinder Top 5: ${person.strengths.join(", ")} (domains: ${person.strengthDomains.join(", ")})
 Enneagram: Type ${person.enneagram} (${ENNEAGRAM_LABELS[person.enneagram]})
 Myers-Briggs: ${person.mbti} (${mbtiGroup(person.mbti)})
-Current pulse score: ${person.pulse}/10
-Harvest utilization signal: ${person.stress} (low = under 60% billable, medium = 60–82% healthy range, high = over 82% sustained = burnout risk)
+Harvest utilization signal: ${person.stress} (low = healthy, medium = watch, high = burnout risk)
 Coach: ${person.coach}
+${richContext}
 
 Generate the coaching narrative.`;
 
@@ -39,131 +78,211 @@ Generate the coaching narrative.`;
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "person", prompt }),
       });
-      const data = await res.json() as { text?: string };
-      setNarrative(data.text || "Unable to generate narrative.");
-    } catch {
-      setNarrative("Unable to generate narrative. Please try again.");
+      const data = await res.json() as { text?: string; error?: string };
+      if (!res.ok || data.error) {
+        setNarrativeError(data.error ?? `API error ${res.status} — check ANTHROPIC_API_KEY in Vercel`);
+      } else {
+        setNarrative(data.text || "Unable to generate narrative.");
+      }
+    } catch (e) {
+      setNarrativeError(e instanceof Error ? e.message : "Network error — please try again.");
     }
     setLoading(false);
   };
 
+  const hue = person.enneagram * 40;
+  const hasPrev = people.length > 1;
+  const hasNext = people.length > 1;
+
+  // Voice quote — pull first richest free-text field
+  const voiceQuote = person.superpower || person.working_on || person.delight_trigger;
+
   return (
-    <div
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div style={{ background: "#FFFFFF", width: "100%", maxWidth: 640, maxHeight: "90vh", overflowY: "auto", borderTop: "3px solid #FF4500" }}>
-        {/* Header */}
-        <div style={{ padding: "24px 24px 20px", borderBottom: "1px solid #1a1a1a", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-            <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#D8D8D4", border: `2px solid ${pulseColor(person.pulse)}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 900, color: "#131313" }}>
-              {person.avatar}
-            </div>
-            <div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: "#131313", letterSpacing: "-0.02em" }}>{person.name}</div>
-              <div style={{ fontSize: 14, color: "#7A7A7A", marginTop: 2 }}>{person.role} · {person.pod} · {person.location}</div>
-              <div style={{ fontSize: 14, color: "#7A7A7A", marginTop: 2 }}>Coach: {person.coach} · Tenure: {person.tenure}</div>
-            </div>
+    <>
+      {/* Backdrop — clicking it closes */}
+      <div
+        onClick={onClose}
+        style={{ position: "fixed", inset: 0, background: "rgba(19,19,19,.55)", zIndex: 200 }}
+      />
+
+      {/* Drawer */}
+      <div
+        className="drawer-enter"
+        style={{
+          position: "fixed", top: 0, right: 0, bottom: 0, width: 480,
+          background: "#FFFFFF",
+          boxShadow: "-12px 0 40px rgba(0,0,0,.30)",
+          zIndex: 201,
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {/* Drawer top bar */}
+        <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid rgba(19,19,19,.08)", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".16em", textTransform: "uppercase", color: "var(--bof-orange)", display: "flex", alignItems: "center", gap: 6 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/sparks/spark-fill-2.svg" alt="" style={{ width: 12, height: 12 }} />
+            Working with {person.name.split(" ")[0]}
+          </span>
+          <div style={{ display: "flex", gap: 4 }}>
+            {hasPrev && (
+              <button onClick={() => navigateTo(-1)} style={{ background: "transparent", border: "1px solid rgba(19,19,19,.20)", color: "#131313", fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "5px 9px", borderRadius: 3, cursor: "pointer" }}>← Prev</button>
+            )}
+            {hasNext && (
+              <button onClick={() => navigateTo(1)} style={{ background: "transparent", border: "1px solid rgba(19,19,19,.20)", color: "#131313", fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "5px 9px", borderRadius: 3, cursor: "pointer" }}>Next →</button>
+            )}
+            <button onClick={onClose} style={{ background: "transparent", border: "1px solid rgba(19,19,19,.20)", color: "rgba(19,19,19,.55)", fontFamily: "var(--font-body)", fontSize: 14, padding: "5px 10px", borderRadius: 3, cursor: "pointer", lineHeight: 1 }}>×</button>
           </div>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#7A7A7A", fontSize: 22, cursor: "pointer", padding: "4px 8px" }}>✕</button>
         </div>
 
-        <div style={{ padding: "20px 24px" }}>
-          {/* Personality grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
-            {/* Strengths */}
-            <div style={{ background: "#F7F7F5", padding: "14px 12px" }}>
-              <div style={{ fontSize: 11, color: "#7A7A7A", letterSpacing: "0.05em", marginBottom: 10 }}>STRENGTHSFINDER</div>
-              {person.strengths.map((s, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>
-                  <div style={{ width: 5, height: 5, borderRadius: "50%", background: STRENGTHS_DOMAINS[person.strengthDomains[i]], flexShrink: 0 }} />
-                  <span style={{ fontSize: 14, color: "#333", fontWeight: i === 0 ? 800 : 400 }}>{s}</span>
-                </div>
-              ))}
+        <div style={{ padding: "20px 22px 28px", flex: 1 }}>
+          {/* Header */}
+          <div style={{ display: "flex", gap: 14, alignItems: "flex-start", marginBottom: 18 }}>
+            <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--bof-green)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "#fff", flexShrink: 0, fontFamily: "var(--font-body)" }}>
+              {initials(person.name)}
             </div>
-            {/* Enneagram */}
-            <div style={{ background: "#F7F7F5", padding: "14px 12px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ fontSize: 11, color: "#7A7A7A", letterSpacing: "0.05em", marginBottom: 8 }}>ENNEAGRAM</div>
-              <div style={{ fontSize: 52, fontWeight: 900, color: `hsl(${hue},60%,55%)`, lineHeight: 1 }}>{person.enneagram}</div>
-              <div style={{ fontSize: 15, color: "#7A7A7A", marginTop: 4, textAlign: "center" }}>{ENNEAGRAM_LABELS[person.enneagram]}</div>
-            </div>
-            {/* MBTI */}
-            <div style={{ background: "#F7F7F5", padding: "14px 12px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderTop: `2px solid ${mbtiColor(person.mbti)}` }}>
-              <div style={{ fontSize: 11, color: "#7A7A7A", letterSpacing: "0.05em", marginBottom: 8 }}>MYERS-BRIGGS</div>
-              <div style={{ fontSize: 36, fontWeight: 900, color: mbtiColor(person.mbti), lineHeight: 1 }}>{person.mbti}</div>
-              <div style={{ fontSize: 14, color: "#7A7A7A", marginTop: 4 }}>{mbtiGroup(person.mbti)}</div>
+            <div style={{ flex: 1 }}>
+              <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 300, fontSize: 28, lineHeight: 1.05, margin: "0 0 4px", letterSpacing: ".01em", color: "#131313" }}>
+                {person.name}
+              </h2>
+              <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.65)", marginBottom: 5 }}>
+                {person.role} · {person.pod} · {person.location}
+              </div>
+              <div style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(19,19,19,.45)" }}>
+                Coach: <span style={{ color: "#131313" }}>{person.coach}</span>
+                {person.tenure && <> · Tenure: <span style={{ color: "#131313" }}>{person.tenure}</span></>}
+              </div>
             </div>
           </div>
 
-          {/* Domain breakdown */}
-          <div style={{ background: "#FAFAFA", padding: "12px 14px", marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: "#7A7A7A", letterSpacing: "0.05em", marginBottom: 10 }}>STRENGTH DOMAINS</div>
-            <div style={{ display: "flex", gap: 6 }}>
+          {/* Voice quote — if available */}
+          {voiceQuote && (
+            <div style={{ background: "var(--bof-cream)", padding: "16px 18px", borderRadius: 4, marginBottom: 18, position: "relative" }}>
+              <div style={{ position: "absolute", top: 6, left: 12, fontFamily: "var(--font-display)", fontSize: 36, color: "var(--bof-orange)", lineHeight: 1, opacity: .5, pointerEvents: "none" }}>&ldquo;</div>
+              <p style={{ margin: "0 0 6px 16px", fontSize: 14, lineHeight: 1.55, fontStyle: "italic", color: "#131313", fontFamily: "var(--font-body-wide)" }}>
+                {voiceQuote}
+              </p>
+              <div style={{ marginLeft: 16, fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(19,19,19,.45)" }}>
+                — {person.name.split(" ")[0]}
+              </div>
+            </div>
+          )}
+
+          {/* Assessments */}
+          <div style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(19,19,19,.55)", marginBottom: 8 }}>Assessments</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+            {/* Myers-Briggs */}
+            <div style={{ background: "#fff", border: "1px solid rgba(19,19,19,.10)", padding: "12px 14px", borderRadius: 4, borderTop: `2px solid ${mbtiColor(person.mbti)}` }}>
+              <div style={{ fontFamily: "var(--font-body)", fontSize: 9, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(19,19,19,.45)", marginBottom: 5 }}>Myers-Briggs</div>
+              <div style={{ fontFamily: "var(--font-body)", fontSize: 26, fontWeight: 700, color: mbtiColor(person.mbti) }}>{person.mbti || "—"}</div>
+              <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 11, color: "rgba(19,19,19,.55)" }}>{mbtiGroup(person.mbti)}</div>
+            </div>
+
+            {/* Enneagram */}
+            {person.enneagram === 0 ? (
+              <div style={{ background: "#fff", border: "1px dashed rgba(19,19,19,.20)", padding: "12px 14px", borderRadius: 4 }}>
+                <div style={{ fontFamily: "var(--font-body)", fontSize: 9, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(19,19,19,.45)", marginBottom: 6 }}>Enneagram</div>
+                <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.55)", lineHeight: 1.4, marginBottom: 8 }}>
+                  {person.name.split(" ")[0]} hasn&apos;t shared this yet.
+                </div>
+                <div style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--bof-orange)" }}>Ask in next 1:1 →</div>
+              </div>
+            ) : (
+              <div style={{ background: "#fff", border: "1px solid rgba(19,19,19,.10)", padding: "12px 14px", borderRadius: 4 }}>
+                <div style={{ fontFamily: "var(--font-body)", fontSize: 9, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(19,19,19,.45)", marginBottom: 5 }}>Enneagram</div>
+                <div style={{ fontFamily: "var(--font-body)", fontSize: 30, fontWeight: 700, color: `hsl(${hue},60%,45%)` }}>{person.enneagram}</div>
+                <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 11, color: "rgba(19,19,19,.55)" }}>{ENNEAGRAM_LABELS[person.enneagram]}</div>
+              </div>
+            )}
+          </div>
+
+          {/* StrengthsFinder */}
+          <div style={{ background: "#fff", border: "1px solid rgba(19,19,19,.10)", padding: "12px 14px", borderRadius: 4, marginBottom: 14 }}>
+            <div style={{ fontFamily: "var(--font-body)", fontSize: 9, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(19,19,19,.45)", marginBottom: 8 }}>StrengthsFinder · Top {person.strengths.length}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+              {person.strengths.map((s, i) => {
+                const domainColor = STRENGTHS_DOMAINS[person.strengthDomains[i]] || "#888";
+                return (
+                  <span key={s} style={{ display: "inline-flex", alignItems: "center", gap: 5, border: `1.5px solid ${domainColor}`, color: domainColor, padding: "4px 9px", borderRadius: 999, fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 700 }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, opacity: .6 }}>{i + 1}</span>
+                    {s}
+                  </span>
+                );
+              })}
+            </div>
+            {/* Domain bar */}
+            <div style={{ display: "flex", gap: 4 }}>
               {Object.entries(STRENGTHS_DOMAINS).map(([domain, color]) => {
                 const count = person.strengthDomains.filter((d) => d === domain).length;
                 return count > 0 ? (
-                  <div key={domain} style={{ flex: count, background: color, padding: "6px 8px", textAlign: "center" }}>
-                    <div style={{ fontSize: 20, fontWeight: 900, color: "#131313" }}>{count}</div>
-                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}>{domain.slice(0, 3).toUpperCase()}</div>
+                  <div key={domain} style={{ flex: count, background: color, color: domain === "Influencing" ? "#131313" : "#fff", padding: "5px 6px", fontSize: 9, fontWeight: 700, letterSpacing: ".10em", textTransform: "uppercase", fontFamily: "var(--font-body)", display: "flex", justifyContent: "space-between", borderRadius: 2 }}>
+                    <span>{domain}</span><span>{count}</span>
                   </div>
                 ) : null;
               })}
             </div>
           </div>
 
-          {/* Pulse + stress (gated) */}
-          {canSeeSensitive && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-              <div style={{ background: "#FAFAFA", padding: "14px", display: "flex", alignItems: "center", gap: 16 }}>
-                <ScoreRing value={person.pulse} size={60} label="Pulse" />
-                <div>
-                  <div style={{ fontSize: 11, color: "#7A7A7A", letterSpacing: "0.05em", marginBottom: 4 }}>PULSE SCORE</div>
-                  <div style={{ fontSize: 14, color: pulseColor(person.pulse), fontWeight: 700 }}>
-                    {person.pulse >= 7.5 ? "Thriving" : person.pulse >= 6 ? "Watch" : "Needs attention"}
-                  </div>
-                </div>
-              </div>
-              <div style={{ background: "#FAFAFA", padding: "14px", display: "flex", alignItems: "center", gap: 16 }}>
-                <div style={{ width: 60, height: 60, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Tag color={stressColor(person.stress === "high" ? 90 : person.stress === "medium" ? 65 : 40)}>
-                    {person.stress.toUpperCase()} STRESS
-                  </Tag>
-                </div>
-                <div style={{ fontSize: 15, color: "#7A7A7A", lineHeight: 1.6 }}>
-                  {person.stress === "high"
-                    ? "Harvest data shows sustained high billable hours. Review workload before adding scope."
-                    : person.stress === "medium"
-                    ? "Harvest utilization is within healthy range. No action needed."
-                    : "Harvest utilization is healthy. No burnout signals."}
-                </div>
-              </div>
-            </div>
-          )}
+          {/* How to work with me */}
+          <div style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(19,19,19,.55)", marginBottom: 10 }}>How to work with me</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            <Field label="Professional communication" value={person.prof_comms} />
+            <Field label="Personal communication" value={person.pers_comms} />
+            <Field label="Peak performance hours" value={person.peak_hours} />
+            <Field label="Recognition style" value={person.recognition_style} />
+            <Field label="Feedback preference" value={person.feedback_pref} />
+            <Field label="Ideation style" value={person.ideation_style} />
+            <Field label="Lights me up" value={person.project_loves} />
+            <Field label="Surefire way to delight me" value={person.delight_trigger} />
+            <Field label="Surefire way to frustrate me" value={person.grumpy_trigger} />
+            <Field label="Working on" value={person.working_on} />
+            <Field label="Growing toward" value={person.growth_areas} />
+            <Field label="What burns me out" value={person.burnout_triggers} />
+            <Field label="How to support me" value={person.burnout_support} />
+          </div>
 
-          {/* AI Coaching Narrative */}
+          {/* Coaching narrative — gated */}
           {canSeeSensitive && (
-            <div>
+            <div style={{ marginTop: 18, borderTop: "1px solid rgba(19,19,19,.08)", paddingTop: 18 }}>
+              {narrativeError && (
+                <div style={{ background: "#FEF0EE", border: "1px solid #F4A99A", padding: "12px 14px", marginBottom: 12, fontFamily: "var(--font-body-wide)", fontSize: 13, color: "#B94A3A", lineHeight: 1.6, borderRadius: 4 }}>
+                  ⚠ {narrativeError}
+                </div>
+              )}
               {narrative ? (
-                <div style={{ background: "#EAF4EE", border: "1px solid #C0DCC9", padding: "16px" }}>
-                  <div style={{ fontSize: 13, color: "#2E7354", letterSpacing: "0.05em", marginBottom: 10, fontWeight: 700 }}>✦ COACHING NARRATIVE — POWERED BY BRAINS VALUES + PERSONALITY PROFILE</div>
-                  <div style={{ fontSize: 16, color: "#7A7A7A", lineHeight: 1.8 }}>{narrative}</div>
-                  <button onClick={generateNarrative} style={{ marginTop: 12, background: "transparent", border: "1px solid #C0DCC9", color: "#2E7354", fontSize: 13, letterSpacing: "0.04em", padding: "6px 12px", cursor: "pointer", fontFamily: "inherit" }}>↺ REGENERATE</button>
+                <div style={{ background: "var(--bof-off-black)", color: "var(--bof-off-white)", padding: "16px 18px", borderRadius: 4 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/sparks/spark-fill-1.svg" alt="" style={{ width: 13, height: 13, filter: "invert(1)" }} />
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".16em", textTransform: "uppercase", color: "rgba(245,245,245,.55)" }}>Coaching narrative</span>
+                  </div>
+                  <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13.5, lineHeight: 1.6 }}>{narrative}</div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                    <button onClick={generateNarrative} style={{ background: "var(--bof-orange)", color: "#fff", border: "none", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "8px 12px", borderRadius: 3, cursor: "pointer" }}>Regenerate</button>
+                  </div>
                 </div>
               ) : (
                 <button
                   onClick={generateNarrative}
                   disabled={loading}
-                  style={{ width: "100%", background: "transparent", border: "1px solid #333", color: "#6B6B6B", fontSize: 14, letterSpacing: "0.05em", textTransform: "uppercase", padding: "14px", cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#2E7354"; (e.currentTarget as HTMLButtonElement).style.color = "#2E7354"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#333"; (e.currentTarget as HTMLButtonElement).style.color = "#666"; }}
+                  style={{ width: "100%", background: "transparent", border: "1px solid rgba(19,19,19,.25)", color: "#131313", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", padding: "12px 16px", cursor: loading ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 3, opacity: loading ? .7 : 1, transition: "all .15s" }}
                 >
-                  {loading ? "GENERATING COACHING NARRATIVE..." : "✦ GENERATE COACHING NARRATIVE — STRENGTHS + PULSE + STRESS"}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/sparks/spark-fill-1.svg" alt="" style={{ width: 13, height: 13 }} />
+                  {loading ? "Generating…" : "Generate coaching narrative"}
                 </button>
               )}
             </div>
           )}
         </div>
+
+        {/* Footer */}
+        <div style={{ padding: "14px 22px", borderTop: "1px solid rgba(19,19,19,.08)", display: "flex", gap: 8, flexShrink: 0 }}>
+          <button style={{ background: "var(--bof-orange)", color: "#fff", border: "none", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "10px 14px", borderRadius: 3, cursor: "pointer" }}>Start a 1:1 note</button>
+          <button onClick={onClose} style={{ background: "transparent", border: "1px solid rgba(19,19,19,.20)", color: "#131313", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "10px 14px", borderRadius: 3, cursor: "pointer" }}>Close</button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

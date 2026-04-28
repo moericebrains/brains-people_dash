@@ -46,6 +46,14 @@ export async function GET() {
     // ── Pulse aggregation ────────────────────────────────────────────────────
     const pulseData = pulseRows.slice(1).filter((r) => r[4]); // skip header, skip empty
 
+    // date range from SubmittedAt col (index 2)
+    const submittedDates = pulseData.map((r) => new Date(r[2])).filter((d) => !isNaN(d.getTime()));
+    submittedDates.sort((a, b) => a.getTime() - b.getTime());
+    const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const dateRange = submittedDates.length
+      ? { from: fmt(submittedDates[0]), to: fmt(submittedDates[submittedDates.length - 1]) }
+      : null;
+
     const feelings = pulseData.map((r) => parseFloat(r[4])).filter((n) => !isNaN(n));
     const stressSources = pulseData.map((r) => parseFloat(r[5])).filter((n) => !isNaN(n));
     const balances = pulseData.map((r) => parseFloat(r[7])).filter((n) => !isNaN(n));
@@ -71,8 +79,10 @@ export async function GET() {
       });
     });
 
-    // celebrations (raw text for now)
-    const celebrations = pulseData.map((r) => r[9]).filter(Boolean);
+    // celebrations — split comma-separated entries into individual items
+    const celebrations = pulseData.flatMap((r) =>
+      (r[9] ?? "").split(",").map((s) => s.trim()).filter(Boolean)
+    );
 
     // open text: stressors + support needs
     const stressors = pulseData.map((r) => r[6]).filter(Boolean);
@@ -121,7 +131,7 @@ export async function GET() {
         avgStressSource: avg(stressSources),
         avgBalance: avg(balances),
         avgGptw: avg(gptwScores),
-        participation: Math.round((pulseData.length / 34) * 100), // n=34 team size
+        participation: Math.round((pulseData.length / 54) * 100), // 2 pulses × 27 members = 54 potential responses
         proudPct: proudTotal
           ? Math.round(((proudCounts["Strongly Agree"] + proudCounts.Agree) / proudTotal) * 100)
           : 0,
@@ -140,6 +150,8 @@ export async function GET() {
           Object.entries(byTeam).map(([team, scores]) => [team, avg(scores)])
         ),
         responseCount: pulseData.length,
+        teamSize: 54,
+        dateRange,
       },
       ona: {
         nodes,

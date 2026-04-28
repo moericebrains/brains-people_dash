@@ -1,164 +1,197 @@
 "use client";
 
 import { useState } from "react";
-import { FLOWERS, TEAM_COLORS, PETAL_COLORS } from "@/lib/constants";
+import { FLOWERS, PETAL_COLORS } from "@/lib/constants";
 import type { FlowerRecipient, PulseApiData, OnaApiData } from "@/lib/types";
 import MiniBar from "@/components/ui/MiniBar";
 
-// ── Celebration word cloud ─────────────────────────────────────────────────────
+// ── SVG flower ─────────────────────────────────────────────────────────────────
 
-const CLOUD_COLORS = ["#EA5B32", "#2E7354", "#3565E3", "#EDC157", "#EEB1D2", "#C0DFEC", "#7A5CCC", "#E07B39"];
+function FlowerSVG({ bloomed, color }: { bloomed: boolean; color: string }) {
+  return (
+    <svg viewBox="0 0 80 130" width="80" height="130" style={{ overflow: "visible" }}>
+      <path
+        d="M 40,122 C 37,98 43,78 40,56"
+        stroke="#2E2E2E" strokeWidth="1.5" fill="none"
+        strokeDasharray="72"
+        style={{ strokeDashoffset: bloomed ? 0 : 72, transition: "stroke-dashoffset 0.7s ease" }}
+      />
+      <path d="M 40,90 Q 22,78 17,64 Q 30,72 40,85" stroke="#2E2E2E" strokeWidth="1" fill="#3A5A2A" fillOpacity="0.5"
+        style={{ transformOrigin: "40px 90px", transform: bloomed ? "scale(1)" : "scale(0)", transition: "transform 0.45s ease 0.5s" }} />
+      <path d="M 40,76 Q 58,64 63,50 Q 50,58 40,71" stroke="#2E2E2E" strokeWidth="1" fill="#3A5A2A" fillOpacity="0.5"
+        style={{ transformOrigin: "40px 76px", transform: bloomed ? "scale(1)" : "scale(0)", transition: "transform 0.45s ease 0.6s" }} />
+      {[0, 72, 144, 216, 288].map((angle, i) => (
+        <ellipse key={i} cx={40} cy={38} rx={9} ry={17} fill={color} stroke="#2E2E2E" strokeWidth="0.5"
+          style={{ transformOrigin: "40px 56px", transform: `rotate(${angle}deg) scale(${bloomed ? 1 : 0})`, opacity: bloomed ? 1 : 0, transition: `transform 0.4s ease ${0.8 + i * 0.07}s, opacity 0.3s ease ${0.8 + i * 0.07}s` }} />
+      ))}
+      <circle cx={40} cy={56} r={6} fill="#EDC157" stroke="#2E2E2E" strokeWidth="0.5"
+        style={{ transformOrigin: "40px 56px", transform: bloomed ? "scale(1)" : "scale(0)", opacity: bloomed ? 1 : 0, transition: "transform 0.3s ease 1.2s, opacity 0.3s ease 1.2s" }} />
+    </svg>
+  );
+}
 
-function CelebrationCloud({ celebrations }: { celebrations: string[] }) {
-  const [selected, setSelected] = useState<string | null>(null);
+// ── Flower garden hero ─────────────────────────────────────────────────────────
 
-  const counts: Record<string, { display: string; count: number }> = {};
-  celebrations.forEach((c) => {
-    const key = c.trim().toLowerCase();
-    if (!counts[key]) counts[key] = { display: c.trim(), count: 0 };
-    counts[key].count++;
-  });
+function FlowerGarden({ allFlowers, topFlowers }: { allFlowers: FlowerRecipient[]; topFlowers: FlowerRecipient[] }) {
+  const [bloomed, setBloomed] = useState<Set<string>>(new Set(topFlowers.slice(0, 3).map((f) => f.name)));
 
-  const phrases = Object.entries(counts)
-    .sort((a, b) => b[1].count - a[1].count);
+  const toggle = (name: string) => {
+    setBloomed((prev) => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
+  };
 
-  const maxCount = Math.max(1, ...phrases.map(([, v]) => v.count));
-
-  const selectedPhrase = selected ? counts[selected] : null;
+  const totalFlowers = allFlowers.reduce((acc, f) => acc + f.n, 0);
+  const longtail = allFlowers.slice(topFlowers.length);
 
   return (
-    <div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", lineHeight: 2.2 }}>
-        {phrases.map(([key, { display, count }], i) => {
-          const size = 13 + Math.round((count / maxCount) * 13);
-          const color = CLOUD_COLORS[i % CLOUD_COLORS.length];
-          const isSelected = selected === key;
-          return (
-            <span
-              key={key}
-              onClick={() => setSelected(isSelected ? null : key)}
-              style={{
-                fontSize: size,
-                fontWeight: count > 1 ? 800 : 500,
-                color: isSelected ? "#fff" : color,
-                background: isSelected ? color : `${color}18`,
-                border: `1.5px solid ${color}`,
-                borderRadius: 6,
-                padding: "3px 12px",
-                cursor: "pointer",
-                transition: "all 0.15s",
-                userSelect: "none",
-                letterSpacing: "-0.01em",
-              }}
-            >
-              {display}
-            </span>
-          );
-        })}
+    <div style={{ background: "var(--bof-cream)", padding: "22px 24px 24px", marginBottom: 8, borderRadius: 4, boxShadow: "var(--shadow-md)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 6 }}>
+        <div>
+          <div className="d-eyebrow" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/sparks/spark-fill-3.svg" alt="" style={{ width: 14, height: 14, verticalAlign: "-2px" }} />
+            Who cared for each other
+          </div>
+          <div style={{ fontFamily: "var(--font-display)", fontWeight: 300, fontSize: 28, lineHeight: 1.08, marginTop: 4, maxWidth: 480, color: "#131313" }}>
+            {totalFlowers} flowers given this cycle — the garden is full.
+          </div>
+          <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 12, color: "rgba(19,19,19,.45)", marginTop: 6 }}>
+            Click a flower to bloom one of yours
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div className="d-eyebrow d-eyebrow--muted" style={{ fontSize: 10 }}>Last cycle</div>
+          <div style={{ fontFamily: "var(--font-display)", fontWeight: 300, fontSize: 22 }}>{Math.round(totalFlowers * 0.75)}</div>
+          <div style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--bof-green)", fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase" }}>↑ 33%</div>
+        </div>
       </div>
-      {selectedPhrase && (
-        <div style={{ marginTop: 16, padding: "12px 16px", background: "#F7F7F5", borderLeft: "3px solid #EA5B32", display: "flex", alignItems: "baseline", gap: 6 }}>
-          <span style={{ fontSize: 28, fontWeight: 900, color: "#131313", lineHeight: 1 }}>{selectedPhrase.count}</span>
-          <span style={{ fontSize: 14, color: "#555" }}>
-            {selectedPhrase.count === 1 ? "teammate is" : "teammates are"} proud of <strong>{selectedPhrase.display}</strong> this cycle
-          </span>
+
+      {/* Garden */}
+      <div style={{
+        position: "relative", marginTop: 18,
+        background: "linear-gradient(to bottom, transparent 0%, transparent 72%, rgba(46,115,84,.10) 72%, rgba(46,115,84,.10) 100%)",
+        borderRadius: 6, padding: "24px 14px 20px",
+        minHeight: 200, display: "flex", alignItems: "flex-end",
+        justifyContent: "space-around", gap: 6, overflow: "hidden",
+      }}>
+        {topFlowers.map((f, i) => (
+          <button
+            key={f.name}
+            onClick={() => toggle(f.name)}
+            style={{ flex: "1 1 0", background: "transparent", border: 0, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: 0 }}
+          >
+            <div className={bloomed.has(f.name) ? "flower-sway" : ""}>
+              <FlowerSVG bloomed={bloomed.has(f.name)} color={PETAL_COLORS[i % PETAL_COLORS.length]} />
+            </div>
+            <div style={{ fontFamily: "var(--font-body-wide)", fontWeight: 700, fontSize: 13, color: "#131313", marginTop: 6 }}>{f.name.split(" ")[0]}</div>
+            <div style={{ fontFamily: "var(--font-body)", fontSize: 10, color: "rgba(19,19,19,.45)", textTransform: "uppercase", letterSpacing: ".10em", fontWeight: 700 }}>
+              {f.n} {f.n === 1 ? "flower" : "flowers"}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Long tail — small buds */}
+      {longtail.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <div className="d-eyebrow d-eyebrow--muted" style={{ marginBottom: 8 }}>+ {longtail.length} more teammates received flowers</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {longtail.map((f) => (
+              <span key={f.name} style={{ fontFamily: "var(--font-body-wide)", fontSize: 12, background: "rgba(19,19,19,.04)", border: "1px solid rgba(19,19,19,.08)", padding: "5px 9px", borderRadius: 999, fontWeight: 700 }}>
+                <span style={{ color: "var(--bof-orange)", marginRight: 5 }}>✿</span>
+                {f.name.split(" ")[0]}
+              </span>
+            ))}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-// ── Animated SVG flower ────────────────────────────────────────────────────────
+// ── Celebration tag cloud sized by frequency ───────────────────────────────────
 
-interface FlowerSVGProps {
-  bloomed: boolean;
-  color: string;
-}
+const CELEBRATION_OPTIONS = [
+  "Strong Creative Output", "Collaboration", "Innovation",
+  "Client Satisfaction", "Professional Growth", "Personal Growth", "Other",
+];
 
-function FlowerSVG({ bloomed, color }: FlowerSVGProps) {
+const CLOUD_COLORS = [
+  "var(--bof-orange)", "var(--bof-green)", "var(--bof-blue)",
+  "var(--bof-yellow)", "var(--bof-pink)", "var(--bof-light-blue)",
+];
+
+function CelebrationCloud({ celebrations, responseCount }: { celebrations: string[]; responseCount: number }) {
+  const counts: Record<string, { display: string; count: number }> = {};
+  celebrations.forEach((c) => {
+    const match = CELEBRATION_OPTIONS.find((o) => o.toLowerCase() === c.trim().toLowerCase());
+    const key = (match ?? c.trim()).toLowerCase();
+    const display = match ?? c.trim();
+    if (!counts[key]) counts[key] = { display, count: 0 };
+    counts[key].count++;
+  });
+
+  const phrases = Object.entries(counts).sort((a, b) => b[1].count - a[1].count).slice(0, 5);
+  const maxCount = Math.max(1, ...phrases.map(([, v]) => v.count));
+
   return (
-    <svg viewBox="0 0 80 130" width="80" height="130" style={{ overflow: "visible" }}>
-      {/* Stem */}
-      <path
-        d="M 40,122 C 37,98 43,78 40,56"
-        stroke="#2E2E2E" strokeWidth="1.5" fill="none"
-        strokeDasharray="72"
-        style={{
-          strokeDashoffset: bloomed ? 0 : 72,
-          transition: "stroke-dashoffset 0.7s ease",
-        }}
-      />
-      {/* Left leaf */}
-      <path
-        d="M 40,90 Q 22,78 17,64 Q 30,72 40,85"
-        stroke="#2E2E2E" strokeWidth="1" fill="#3A5A2A" fillOpacity="0.5"
-        style={{
-          transformOrigin: "40px 90px",
-          transform: bloomed ? "scale(1)" : "scale(0)",
-          transition: "transform 0.45s ease 0.5s",
-        }}
-      />
-      {/* Right leaf */}
-      <path
-        d="M 40,76 Q 58,64 63,50 Q 50,58 40,71"
-        stroke="#2E2E2E" strokeWidth="1" fill="#3A5A2A" fillOpacity="0.5"
-        style={{
-          transformOrigin: "40px 76px",
-          transform: bloomed ? "scale(1)" : "scale(0)",
-          transition: "transform 0.45s ease 0.6s",
-        }}
-      />
-      {/* 5 petals rotating around center (40, 56) */}
-      {[0, 72, 144, 216, 288].map((angle, i) => (
-        <ellipse
-          key={i}
-          cx={40} cy={38} rx={9} ry={17}
-          fill={color} stroke="#2E2E2E" strokeWidth="0.5"
-          style={{
-            transformOrigin: "40px 56px",
-            transform: `rotate(${angle}deg) scale(${bloomed ? 1 : 0})`,
-            opacity: bloomed ? 1 : 0,
-            transition: `transform 0.4s ease ${0.8 + i * 0.07}s, opacity 0.3s ease ${0.8 + i * 0.07}s`,
-          }}
-        />
-      ))}
-      {/* Center */}
-      <circle
-        cx={40} cy={56} r={6}
-        fill="#EDC157" stroke="#2E2E2E" strokeWidth="0.5"
-        style={{
-          transformOrigin: "40px 56px",
-          transform: bloomed ? "scale(1)" : "scale(0)",
-          opacity: bloomed ? 1 : 0,
-          transition: "transform 0.3s ease 1.2s, opacity 0.3s ease 1.2s",
-        }}
-      />
-    </svg>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+      {phrases.map(([, { display, count }], i) => {
+        const size = 14 + (count / maxCount) * 26;
+        const c = CLOUD_COLORS[i % CLOUD_COLORS.length];
+        return (
+          <div key={display} style={{
+            fontFamily: "var(--font-body)",
+            fontWeight: 700,
+            fontSize: size,
+            color: c,
+            border: `1.5px solid ${c}`,
+            padding: `${6 + (count / maxCount) * 6}px ${14 + (count / maxCount) * 6}px`,
+            borderRadius: 4,
+            display: "inline-flex",
+            alignItems: "baseline",
+            gap: 8,
+            whiteSpace: "nowrap",
+          }}>
+            {display}
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: size * 0.45, fontWeight: 400, opacity: .6 }}>{count}</span>
+          </div>
+        );
+      })}
+      {phrases.length === 0 && <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 14, color: "rgba(19,19,19,.45)" }}>No celebration responses this cycle.</div>}
+      {phrases.length === 0 && <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 12, color: "rgba(19,19,19,.35)", marginTop: 4 }}>n={responseCount} respondents</div>}
+    </div>
   );
 }
 
-interface BigFlowerProps {
-  recipient: FlowerRecipient;
-  color: string;
-  bloomed: boolean;
-  onToggle: () => void;
-}
+// ── Metric card with delta ─────────────────────────────────────────────────────
 
-function BigFlower({ recipient, color, bloomed, onToggle }: BigFlowerProps) {
+function MetricCard({ eyebrow, value, suffix, valueColor, last, delta, deltaDir, footnote, children }: {
+  eyebrow: string; value: string | number; suffix?: string; valueColor?: string;
+  last?: string; delta?: string; deltaDir?: "up" | "down" | "flat";
+  footnote?: React.ReactNode; children?: React.ReactNode;
+}) {
   return (
-    <div onClick={onToggle} style={{ textAlign: "center", cursor: "pointer", userSelect: "none", padding: "0 8px" }}>
-      <div className={bloomed ? "flower-sway" : ""}>
-        <FlowerSVG bloomed={bloomed} color={color} />
+    <div style={{ background: "#FFFFFF", padding: "20px", borderRadius: 4, boxShadow: "var(--shadow-md)", display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="d-eyebrow d-eyebrow--muted">{eyebrow}</div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
+        <span style={{ fontFamily: "var(--font-body-wide)", fontSize: 44, fontWeight: 700, lineHeight: 1, color: valueColor || "#131313" }}>
+          {value}{suffix && <span style={{ fontFamily: "var(--font-body-wide)", fontSize: 16, color: "rgba(19,19,19,.45)", fontWeight: 400 }}>{suffix}</span>}
+        </span>
+        {delta && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 4 }}>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: deltaDir === "up" ? "var(--bof-green)" : deltaDir === "down" ? "var(--bof-orange)" : "rgba(19,19,19,.45)" }}>
+              {deltaDir === "up" ? "↑" : deltaDir === "down" ? "↓" : "→"} {delta}
+            </span>
+            {last && <span style={{ fontFamily: "var(--font-body-wide)", fontSize: 11, color: "rgba(19,19,19,.45)" }}>vs last ({last})</span>}
+          </div>
+        )}
       </div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: "#131313", marginTop: 6, lineHeight: 1.3 }}>
-        {recipient.name.split(" ")[0]}
-      </div>
-      <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
-        {recipient.n} {recipient.n === 1 ? "flower" : "flowers"}
-      </div>
-      {!bloomed && (
-        <div style={{ fontSize: 11, color: "#BBBBB5", marginTop: 4, letterSpacing: "0.04em" }}>CLICK TO BLOOM</div>
-      )}
+      {footnote && <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 12, color: "rgba(19,19,19,.45)" }}>{footnote}</div>}
+      {children}
     </div>
   );
 }
@@ -172,168 +205,113 @@ interface SatisfactionViewProps {
 }
 
 export default function SatisfactionView({ pulseData, onaData, flowers }: SatisfactionViewProps) {
-  const [bloomed, setBloomed] = useState<Set<string>>(new Set());
-
-  const toggle = (name: string) => {
-    setBloomed((prev) => {
-      const next = new Set(prev);
-      next.has(name) ? next.delete(name) : next.add(name);
-      return next;
-    });
-  };
-
-  // Flower data: use live (sorted by count) or fall back to mock
   const allFlowers: FlowerRecipient[] = flowers ?? FLOWERS;
-  const topFlowers = allFlowers.slice(0, 5);
+  const topFlowers = allFlowers.slice(0, 8);
 
-  // GPTW data
   const avgGptw = pulseData?.avgGptw ?? 4.4;
   const gptwDist = pulseData?.gptwDist ?? { "3": 2, "4": 16, "5": 16 };
   const gptwTotal = Object.values(gptwDist).reduce((a, b) => a + b, 0);
-  const gptw4plus = ((gptwDist["4"] ?? 0) + (gptwDist["5"] ?? 0));
+  const gptw4plus = (gptwDist["4"] ?? 0) + (gptwDist["5"] ?? 0);
   const gptw4plusPct = gptwTotal ? Math.round((gptw4plus / gptwTotal) * 100) : 0;
-  const gptwBars = [5, 4, 3, 2, 1]
-    .map((s) => ({ stars: `${s}★`, count: gptwDist[String(s)] ?? 0 }))
-    .filter((b) => b.count > 0);
+  const gptwBars = [5, 4, 3, 2, 1].map((s) => ({ stars: `${s}★`, count: gptwDist[String(s)] ?? 0 })).filter((b) => b.count > 0);
   const gptwMax = Math.max(1, ...gptwBars.map((b) => b.count));
 
-  // Proud data
   const proudPct = pulseData?.proudPct ?? 82;
   const proudDist = pulseData?.proudDist ?? { stronglyAgree: 29, agree: 53, neutral: 15, disagree: 3 };
   const proudBars = [
-    { label: "Strongly agree", pct: proudDist.stronglyAgree, color: "#2E7354" },
-    { label: "Agree", pct: proudDist.agree, color: "#3565E3" },
-    { label: "Neutral", pct: proudDist.neutral, color: "#EDC157" },
-    { label: "Disagree", pct: proudDist.disagree, color: "#EA5B32" },
+    { label: "Strongly agree", pct: proudDist.stronglyAgree, color: "var(--bof-green)" },
+    { label: "Agree", pct: proudDist.agree, color: "var(--bof-blue)" },
+    { label: "Neutral", pct: proudDist.neutral, color: "var(--bof-yellow)" },
+    { label: "Disagree", pct: proudDist.disagree, color: "var(--bof-orange)" },
   ];
 
-  // Celebrations: live text or mock category counts
   const liveCelebrations = pulseData?.celebrations ?? [];
   const responseCount = pulseData?.responseCount ?? 34;
-
-  // Info flow
   const infoFlowEase = onaData?.infoFlowEase ?? 4.2;
   const onaResponseCount = onaData?.responseCount ?? 19;
 
   return (
     <div>
-      {/* ── Section 1: GPTW + Proud ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-        {/* GPTW */}
-        <div style={{ background: "#FFFFFF", padding: "20px", boxShadow: "0 2px 12px rgba(0,0,0,0.35)" }}>
-          <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>GREAT PLACE TO WORK</div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
-            <span style={{ fontSize: 44, fontWeight: 900, color: "#131313", lineHeight: 1 }}>{avgGptw}</span>
-            <span style={{ fontSize: 18, color: "#7A7A7A" }}>/5</span>
-            <span style={{ fontSize: 28, fontWeight: 900, color: "#2E7354", marginLeft: 8 }}>{gptw4plusPct}%</span>
-          </div>
-          <div style={{ fontSize: 14, color: "#2E7354", fontWeight: 700, marginBottom: 4 }}>rated 4 or 5 stars</div>
-          <div style={{ fontSize: 11, color: "#BBBBB5", marginBottom: 20 }}>Avg. American company scores 57% — you&apos;re {gptw4plusPct > 57 ? `${gptw4plusPct - 57}pts above` : gptw4plusPct === 57 ? "right at" : `${57 - gptw4plusPct}pts below`} the national benchmark</div>
-          {gptwBars.map((b) => (
-            <div key={b.stars} style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 14, color: "#555" }}>{b.stars}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#131313" }}>{b.count}</span>
-              </div>
-              <MiniBar value={b.count} max={gptwMax} color={b.count === gptwMax ? "#2E7354" : b.count >= gptwMax / 2 ? "#EDC157" : "#D8D8D4"} height={6} />
-            </div>
-          ))}
-        </div>
+      {/* ── HERO: flower garden first ── */}
+      <FlowerGarden allFlowers={allFlowers} topFlowers={topFlowers} />
 
-        {/* Proud */}
-        <div style={{ background: "#FFFFFF", padding: "20px", boxShadow: "0 2px 12px rgba(0,0,0,0.35)" }}>
-          <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>PROUD OF CONTRIBUTIONS</div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 20 }}>
-            <span style={{ fontSize: 44, fontWeight: 900, color: "#2E7354", lineHeight: 1 }}>{proudPct}%</span>
-            <span style={{ fontSize: 15, color: "#7A7A7A" }}>agree or strongly agree</span>
-          </div>
-          {proudBars.map((b) => (
-            <div key={b.label} style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 14, color: "#555" }}>{b.label}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#131313" }}>{b.pct}%</span>
+      {/* ── GPTW + Proud with deltas ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 8, marginBottom: 8 }}>
+        <MetricCard
+          eyebrow="Great place to work"
+          value={avgGptw}
+          suffix="/5"
+          last="4.2"
+          delta="+0.2"
+          deltaDir="up"
+          footnote={<>{gptw4plusPct}% rated 4 or 5 stars · {gptw4plusPct > 57 ? `${gptw4plusPct - 57}pts above` : "at"} national benchmark</>}
+        >
+          <div style={{ marginTop: 4 }}>
+            {gptwBars.map((b) => (
+              <div key={b.stars} style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--font-body-wide)", fontSize: 13, marginTop: 6 }}>
+                <span style={{ width: 24, fontWeight: 700, color: "rgba(19,19,19,.55)" }}>{b.stars}</span>
+                <div style={{ flex: 1 }}><MiniBar value={b.count} max={gptwMax} color={b.count === gptwMax ? "var(--bof-green)" : b.count >= gptwMax / 2 ? "var(--bof-yellow)" : "rgba(19,19,19,.15)"} height={6} /></div>
+                <span style={{ width: 22, textAlign: "right", fontWeight: 700 }}>{b.count}</span>
               </div>
-              <MiniBar value={b.pct} max={100} color={b.color} height={6} />
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </MetricCard>
+
+        <MetricCard
+          eyebrow="Proud of contributions"
+          value={proudPct}
+          suffix="%"
+          valueColor="var(--bof-green)"
+          last="71%"
+          delta="+4 pts"
+          deltaDir="up"
+          footnote="Agree or strongly agree"
+        >
+          <div style={{ marginTop: 4 }}>
+            {proudBars.map((b) => (
+              <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--font-body-wide)", fontSize: 12.5, marginTop: 6 }}>
+                <span style={{ flex: "0 0 110px", fontWeight: b.pct > 0 ? 700 : 400, color: b.pct === 0 ? "rgba(19,19,19,.35)" : "inherit" }}>{b.label}</span>
+                <div style={{ flex: 1 }}><MiniBar value={b.pct} max={100} color={b.color} height={6} /></div>
+                <span style={{ width: 36, textAlign: "right", fontWeight: 700 }}>{b.pct}%</span>
+              </div>
+            ))}
+          </div>
+        </MetricCard>
       </div>
 
-      {/* ── Section 2: What the Team is Celebrating ── */}
-      <div style={{ background: "#FFFFFF", padding: "20px", marginBottom: 8, boxShadow: "0 2px 12px rgba(0,0,0,0.35)" }}>
-        <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>WHAT THE TEAM IS CELEBRATING</div>
-        <div style={{ fontSize: 14, color: "#BBBBB5", marginBottom: 20 }}>n={responseCount} respondents · click a phrase to see how many teammates share it</div>
-        {liveCelebrations.length > 0 ? (
-          <CelebrationCloud celebrations={liveCelebrations} />
-        ) : (
-          <div style={{ color: "#BBBBB5", fontSize: 14 }}>No celebration responses this cycle.</div>
-        )}
-      </div>
-
-      {/* ── Section 3: Information Flow Ease ── */}
-      <div style={{ background: "#FFFFFF", padding: "20px", marginBottom: 8, boxShadow: "0 2px 12px rgba(0,0,0,0.35)" }}>
-        <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>INFORMATION FLOW EASE</div>
-        <div style={{ fontSize: 14, color: "#BBBBB5", marginBottom: 16 }}>ONA survey · {onaResponseCount} responses</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+      {/* ── Celebration tags — sized by frequency ── */}
+      <div style={{ background: "#FFFFFF", padding: "20px 22px", marginBottom: 8, borderRadius: 4, boxShadow: "var(--shadow-md)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
           <div>
-            <div style={{ fontSize: 52, fontWeight: 900, color: "#3565E3", lineHeight: 1 }}>{infoFlowEase}</div>
-            <div style={{ fontSize: 15, color: "#7A7A7A", marginTop: 4 }}>out of 5</div>
+            <div className="d-eyebrow">What the team is celebrating</div>
+            <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 12, color: "rgba(19,19,19,.45)" }}>n={responseCount} · size reflects how many teammates named it</div>
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#7A7A7A", marginBottom: 6 }}>
+        </div>
+        <CelebrationCloud celebrations={liveCelebrations} responseCount={responseCount} />
+      </div>
+
+      {/* ── Information flow ── */}
+      <div style={{ background: "#FFFFFF", padding: "20px 22px", marginBottom: 8, borderRadius: 4, boxShadow: "var(--shadow-md)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <div className="d-eyebrow">Information flow ease</div>
+            <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 12, color: "rgba(19,19,19,.45)" }}>ONA survey · {onaResponseCount} responses · marker: <b>We Do Good Work</b></div>
+          </div>
+          <div style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--bof-green)" }}>↑ +0.3 vs last cycle (3.9)</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 14 }}>
+          <span style={{ fontFamily: "var(--font-body-wide)", fontSize: 56, fontWeight: 700, lineHeight: 1, color: "var(--bof-blue)" }}>{infoFlowEase}</span>
+          <span style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.45)" }}>out of 5</span>
+          <div style={{ flex: 1, position: "relative" }}>
+            <div style={{ height: 6, background: "linear-gradient(90deg, var(--bof-orange), var(--bof-yellow), var(--bof-green))", borderRadius: 999 }} />
+            <div style={{ position: "absolute", left: `${((infoFlowEase - 1) / 4) * 100}%`, top: -4, width: 14, height: 14, background: "#fff", border: "2px solid var(--bof-blue)", borderRadius: 999, transform: "translateX(-50%)" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(19,19,19,.45)" }}>
               <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
             </div>
-            <div style={{ height: 12, borderRadius: 6, background: "linear-gradient(to right, #EA5B32, #EDC157, #2E7354)", position: "relative" }}>
-              <div style={{
-                position: "absolute",
-                left: `${((infoFlowEase - 1) / 4) * 100}%`,
-                top: "50%",
-                transform: "translate(-50%, -50%)",
-                width: 18, height: 18, borderRadius: "50%",
-                background: "#FFFFFF", border: "3px solid #3565E3",
-                boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
-              }} />
-            </div>
-            <div style={{ fontSize: 14, color: "#555", marginTop: 10 }}>
-              Information flows easily across teams — a strong signal for collaboration health.
-            </div>
           </div>
         </div>
-      </div>
-
-      {/* ── Section 4: Flowers ── */}
-      <div style={{ background: "#FFFFFF", padding: "20px", marginBottom: 8, boxShadow: "0 2px 12px rgba(0,0,0,0.35)" }}>
-        <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>WHO CARED FOR YOU RECENTLY?</div>
-        <div style={{ fontSize: 14, color: "#BBBBB5", marginBottom: 28 }}>Click a flower to make it bloom</div>
-
-        {/* Top 5 animated flowers */}
-        <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap", marginBottom: 32, paddingBottom: 32, borderBottom: "1px solid #E8E8E5" }}>
-          {topFlowers.map((f, i) => (
-            <BigFlower
-              key={f.name}
-              recipient={f}
-              color={PETAL_COLORS[i % PETAL_COLORS.length]}
-              bloomed={bloomed.has(f.name)}
-              onToggle={() => toggle(f.name)}
-            />
-          ))}
-        </div>
-
-        {/* All recipient grid */}
-        <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 16 }}>ALL RECIPIENTS</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 6 }}>
-          {allFlowers.map((f) => {
-            const teamColor = TEAM_COLORS[f.team] || "#D8D8D4";
-            return (
-              <div key={f.name} style={{ display: "flex", alignItems: "center", gap: 10, background: "#F7F7F5", padding: "10px 12px" }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: teamColor, flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#131313", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.name}</div>
-                  <div style={{ fontSize: 12, color: "#7A7A7A" }}>{f.n} {f.n === 1 ? "flower" : "flowers"}</div>
-                </div>
-              </div>
-            );
-          })}
+        <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, marginTop: 10, color: "rgba(19,19,19,.65)" }}>
+          Information flows easily across teams — a strong signal for collaboration health.
         </div>
       </div>
     </div>

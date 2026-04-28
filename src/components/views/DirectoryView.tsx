@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { PEOPLE, STRENGTHS_DOMAINS } from "@/lib/constants";
-import { pulseColor, mbtiColor, mbtiGroup } from "@/lib/utils";
+import { mbtiColor } from "@/lib/utils";
 import type { Person, Role } from "@/lib/types";
-import Tag from "@/components/ui/Tag";
 
 interface DirectoryViewProps {
   role: Role;
@@ -12,61 +11,181 @@ interface DirectoryViewProps {
   people?: Person[];
 }
 
-export default function DirectoryView({ role, onSelectPerson, people = PEOPLE }: DirectoryViewProps) {
+const initials = (name: string) => {
+  const parts = name.trim().split(" ");
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
+};
+
+const AVATAR_COLORS = [
+  "var(--bof-green)", "var(--bof-blue)", "var(--bof-orange)",
+  "var(--bof-yellow)", "var(--bof-pink)",
+];
+
+function avatarColor(id: number) {
+  return AVATAR_COLORS[id % AVATAR_COLORS.length];
+}
+
+function avatarTextColor(color: string) {
+  return color === "var(--bof-yellow)" || color === "var(--bof-pink)" ? "#131313" : "#F5F5F5";
+}
+
+export default function DirectoryView({ onSelectPerson, people = PEOPLE }: DirectoryViewProps) {
   const [search, setSearch] = useState("");
-  const canSeeSensitive = role === "leadership" || role === "coach";
+  const [filterPod, setFilterPod] = useState<string | null>(null);
+  const [filterLoc, setFilterLoc] = useState<string | null>(null);
+  const [filterMissing, setFilterMissing] = useState(false);
+
+  // Collect unique pods + locations
+  const pods = useMemo(() => [...new Set(people.map((p) => p.pod))].sort(), [people]);
+  const locations = useMemo(() => [...new Set(people.map((p) => p.location))].sort(), [people]);
+  const missingCount = people.filter((p) => !p.mbti && !p.enneagram && !p.strengths?.length).length;
 
   const visible = people.filter((p) => {
     const q = search.toLowerCase();
-    return p.name.toLowerCase().includes(q) || p.role.toLowerCase().includes(q) || p.pod.toLowerCase().includes(q);
+    const matchesSearch = !q || p.name.toLowerCase().includes(q) || p.role.toLowerCase().includes(q) || p.pod.toLowerCase().includes(q);
+    const matchesPod = !filterPod || p.pod === filterPod;
+    const matchesLoc = !filterLoc || p.location === filterLoc;
+    const matchesMissing = !filterMissing || (!p.mbti && !p.enneagram && !p.strengths?.length);
+    return matchesSearch && matchesPod && matchesLoc && matchesMissing;
   });
+
+  const isFiltered = filterPod || filterLoc || filterMissing || search;
 
   return (
     <div>
-      <div style={{ background: "#FFFFFF", padding: "14px 20px", marginBottom: 8, boxShadow: "0 2px 12px rgba(0,0,0,0.35)" }}>
+      {/* Search + filter chips */}
+      <div style={{ background: "#FFFFFF", padding: "14px 18px", marginBottom: 8, borderRadius: 4, boxShadow: "var(--shadow-md)" }}>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="SEARCH BY NAME, ROLE, OR POD..."
-          style={{ background: "transparent", border: "none", borderBottom: "1px solid #333", color: "#131313", fontSize: 15, letterSpacing: "0.04em", width: "100%", padding: "6px 0", outline: "none", fontFamily: "inherit", textTransform: "uppercase" }}
+          placeholder="Search by name, role, or pod..."
+          style={{
+            width: "100%", padding: "10px 14px",
+            fontFamily: "var(--font-body-wide)", fontSize: 15,
+            border: "1px solid rgba(19,19,19,.15)", borderRadius: 4,
+            outline: "none", marginBottom: 12, background: "#FAFAFA",
+            color: "#131313",
+          }}
         />
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(19,19,19,.45)", marginRight: 4 }}>Filter</span>
+
+          {/* Pod filters */}
+          {pods.map((pod) => (
+            <button key={pod} onClick={() => setFilterPod(filterPod === pod ? null : pod)} style={{
+              fontFamily: "var(--font-body)", fontWeight: 700, fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase",
+              padding: "4px 8px", borderRadius: 3, cursor: "pointer", border: "none",
+              background: filterPod === pod ? "var(--bof-off-black)" : "rgba(19,19,19,.06)",
+              color: filterPod === pod ? "#F5F5F5" : "#131313",
+              transition: "all .15s",
+            }}>{pod}</button>
+          ))}
+
+          {pods.length > 0 && <div style={{ width: 1, height: 18, background: "rgba(19,19,19,.15)", margin: "0 4px" }} />}
+
+          {/* Location filters */}
+          {locations.map((loc) => (
+            <button key={loc} onClick={() => setFilterLoc(filterLoc === loc ? null : loc)} style={{
+              fontFamily: "var(--font-body)", fontWeight: 700, fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase",
+              padding: "4px 8px", borderRadius: 3, cursor: "pointer", border: "none",
+              background: filterLoc === loc ? "var(--bof-off-black)" : "rgba(19,19,19,.06)",
+              color: filterLoc === loc ? "#F5F5F5" : "#131313",
+              transition: "all .15s",
+            }}>{loc}</button>
+          ))}
+
+          {locations.length > 0 && <div style={{ width: 1, height: 18, background: "rgba(19,19,19,.15)", margin: "0 4px" }} />}
+
+          {/* Missing data filter */}
+          {missingCount > 0 && (
+            <button onClick={() => setFilterMissing(!filterMissing)} style={{
+              fontFamily: "var(--font-body)", fontWeight: 700, fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase",
+              padding: "4px 8px", borderRadius: 3, cursor: "pointer",
+              background: filterMissing ? "var(--bof-orange)" : "transparent",
+              color: filterMissing ? "#F5F5F5" : "#131313",
+              border: filterMissing ? "none" : "1px solid rgba(19,19,19,.20)",
+              transition: "all .15s",
+            }}>Missing assessments · {missingCount}</button>
+          )}
+
+          {isFiltered && (
+            <button onClick={() => { setSearch(""); setFilterPod(null); setFilterLoc(null); setFilterMissing(false); }} style={{ background: "transparent", border: "none", fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(19,19,19,.45)", cursor: "pointer", marginLeft: 4 }}>Clear ×</button>
+          )}
+        </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 8 }}>
-        {visible.map((p, i) => (
-          <div key={i} onClick={() => onSelectPerson(p)}
-            style={{ background: "#FFFFFF", padding: "18px 16px", cursor: "pointer", borderLeft: "3px solid transparent", transition: "all 0.15s" }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "#161616"; (e.currentTarget as HTMLDivElement).style.borderLeftColor = "#EA5B32"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = "#FFFFFF"; (e.currentTarget as HTMLDivElement).style.borderLeftColor = "transparent"; }}
-          >
-            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-              <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#D8D8D4", border: `2px solid ${canSeeSensitive ? pulseColor(p.pulse) : "#333"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800, color: "#131313", flexShrink: 0 }}>
-                {p.avatar}
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: "#131313", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
-                <div style={{ fontSize: 13, color: "#6B6B6B", marginTop: 2 }}>{p.role}</div>
-                <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
-                  <Tag color="#131313">{p.pod}</Tag>
-                  <Tag color="#131313">{p.location}</Tag>
+
+      {/* People grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 6 }}>
+        {visible.map((p) => {
+          const ac = avatarColor(p.id);
+          const missing = !p.mbti && p.enneagram === 0 && !p.strengths?.length;
+          const hasMbti = !!p.mbti;
+          const hasEnne = p.enneagram > 0;
+          const hasStr = p.strengths?.length > 0;
+
+          return (
+            <div
+              key={p.id}
+              onClick={() => onSelectPerson(p)}
+              style={{
+                background: "#FFFFFF",
+                padding: "14px 14px",
+                cursor: "pointer",
+                borderRadius: 4,
+                border: "1px solid rgba(19,19,19,.08)",
+                transition: "all .15s",
+                position: "relative",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.borderColor = "var(--bof-orange)";
+                (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-md)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.borderColor = "rgba(19,19,19,.08)";
+                (e.currentTarget as HTMLElement).style.boxShadow = "none";
+              }}
+            >
+              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: ac, color: avatarTextColor(ac), display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                  {initials(p.name)}
                 </div>
-                <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 11, color: mbtiColor(p.mbti), letterSpacing: "0.06em" }}>{p.mbti}</span>
-                  <span style={{ fontSize: 11, color: "#7A7A7A" }}>·</span>
-                  <span style={{ fontSize: 11, color: `hsl(${p.enneagram * 40},60%,55%)`, letterSpacing: "0.06em" }}>E{p.enneagram}</span>
-                  <span style={{ fontSize: 11, color: "#7A7A7A" }}>·</span>
-                  <span style={{ fontSize: 11, color: STRENGTHS_DOMAINS[p.strengthDomains[0]], letterSpacing: "0.06em" }}>{p.strengths[0]}</span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 15, fontWeight: 700, color: "#131313", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
+                  <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 12, color: "rgba(19,19,19,.45)", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.role}</div>
                 </div>
               </div>
+
+              <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
+                <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, background: "rgba(19,19,19,.06)", color: "rgba(19,19,19,.55)", padding: "2px 6px", borderRadius: 2, letterSpacing: ".06em" }}>{p.pod}</span>
+                <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, background: "rgba(19,19,19,.06)", color: "rgba(19,19,19,.55)", padding: "2px 6px", borderRadius: 2, letterSpacing: ".06em" }}>{p.location}</span>
+              </div>
+
+              {missing ? (
+                <div style={{ background: "rgba(19,19,19,.03)", border: "1px dashed rgba(19,19,19,.18)", borderRadius: 3, padding: "6px 8px", fontFamily: "var(--font-body-wide)", fontSize: 11, color: "rgba(19,19,19,.50)" }}>
+                  Hasn&apos;t shared assessments —{" "}
+                  <span style={{ color: "var(--bof-orange)", fontWeight: 700 }}>ask in next 1:1</span>
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                  {hasMbti && <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: mbtiColor(p.mbti), letterSpacing: ".06em" }}>{p.mbti}</span>}
+                  {hasEnne && hasMbti && <span style={{ color: "rgba(19,19,19,.25)", fontSize: 11 }}>·</span>}
+                  {hasEnne && <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: `hsl(${p.enneagram * 40},55%,45%)`, letterSpacing: ".06em" }}>E{p.enneagram}</span>}
+                  {hasStr && (hasMbti || hasEnne) && <span style={{ color: "rgba(19,19,19,.25)", fontSize: 11 }}>·</span>}
+                  {hasStr && <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: STRENGTHS_DOMAINS[p.strengthDomains?.[0]] || "rgba(19,19,19,.45)", letterSpacing: ".06em" }}>{p.strengths[0]}</span>}
+                  {!hasMbti && <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--bof-orange)", fontWeight: 700 }}>No MBTI — ask in 1:1</span>}
+                </div>
+              )}
             </div>
-            {canSeeSensitive && (
-              <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid #1a1a1a", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "0.04em" }}>PULSE</span>
-                <span style={{ fontSize: 17, fontWeight: 800, color: pulseColor(p.pulse) }}>{p.pulse}</span>
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
+
+      {visible.length === 0 && (
+        <div style={{ background: "#FFFFFF", padding: "40px 20px", borderRadius: 4, textAlign: "center", boxShadow: "var(--shadow-md)", marginTop: 4 }}>
+          <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 15, color: "rgba(19,19,19,.45)" }}>No teammates match this filter.</div>
+          <button onClick={() => { setSearch(""); setFilterPod(null); setFilterLoc(null); setFilterMissing(false); }} style={{ marginTop: 10, background: "transparent", border: "1px solid rgba(19,19,19,.20)", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", padding: "8px 12px", borderRadius: 3, cursor: "pointer", color: "#131313" }}>Clear filters</button>
+        </div>
+      )}
     </div>
   );
 }
