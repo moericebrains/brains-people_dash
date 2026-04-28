@@ -238,9 +238,15 @@ const MARKERS = [
     low: "[Team] might need a lift — send a note of appreciation or acknowledge their work publicly this week." },
 ];
 
+// Stress scale: 1 = low stress (team is thriving), 10 = high stress (team needs support)
+function stressScoreColor(v: number): string {
+  return v >= 7.5 ? "var(--bof-orange)" : v >= 5 ? "#EDC157" : "var(--bof-green)";
+}
+
 function nudgeForScore(score: number, team: string, markerIdx: number) {
   const m = MARKERS[markerIdx % MARKERS.length];
-  const idea = score >= 7.5 ? m.high : score >= 5 ? m.mid : m.low;
+  // High stress score → team needs support (m.low); low stress → thriving (m.high)
+  const idea = score < 4.5 ? m.high : score < 7.5 ? m.mid : m.low;
   return { marker: m.name, color: m.color, idea: idea.replace(/\[Team\]/g, team) };
 }
 
@@ -268,11 +274,11 @@ function TeamCoaching({ byTeam, fallbackByTeam }: { byTeam: Record<string, numbe
               padding: "14px 16px",
               borderRight: i % 3 !== 2 ? "1px solid rgba(19,19,19,.10)" : "none",
               borderBottom: Math.floor(i / 3) < Math.floor((teams.length - 1) / 3) ? "1px solid rgba(19,19,19,.10)" : "none",
-              borderTop: `3px solid ${pulseColor(score)}`,
+              borderTop: `3px solid ${stressScoreColor(score)}`,
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
                 <span style={{ fontFamily: "var(--font-body-wide)", fontWeight: 700, fontSize: 16 }}>{team}</span>
-                <span style={{ fontFamily: "var(--font-body-wide)", fontWeight: 700, fontSize: 18, color: pulseColor(score) }}>{score}</span>
+                <span style={{ fontFamily: "var(--font-body-wide)", fontWeight: 700, fontSize: 18, color: stressScoreColor(score) }}>{score}</span>
               </div>
               <div style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: nudge.color, marginBottom: 6 }}>{nudge.marker}</div>
               <div style={{ fontFamily: "var(--font-body-wide)", fontSize: 13, color: "rgba(19,19,19,.65)", lineHeight: 1.5 }}>{nudge.idea}</div>
@@ -356,19 +362,19 @@ export default function PulseView({ pulseData, role }: PulseViewProps) {
   const topStressor = countStressOptions(pulseData?.stressors ?? [])[0] ?? null;
   const topSupport = countSupportOptions(pulseData?.supportNeeds ?? [])[0] ?? null;
 
-  // Build editorial cycle summary
-  const topTeam = Object.entries(cleanByTeam).sort((a, b) => b[1] - a[1])[0];
-  const lowTeam = Object.entries(cleanByTeam).sort((a, b) => a[1] - b[1])[0];
+  // Build editorial cycle summary — stress scale: higher = more stressed
+  const mostStressedTeam = Object.entries(cleanByTeam).sort((a, b) => b[1] - a[1])[0];
+  const leastStressedTeam = Object.entries(cleanByTeam).sort((a, b) => a[1] - b[1])[0];
   const cycleSentence = (() => {
-    if (feeling >= 7) return `The team is feeling strong at ${feeling}/10 — energy is high this cycle.`;
-    if (feeling >= 5) return `The team is feeling steady at ${feeling}/10 — worth watching for shifts.`;
-    return `The team is at ${feeling}/10 this cycle — this needs a check-in.`;
+    if (feeling >= 7) return `Stress is running high at ${feeling}/10 — this cycle needs attention.`;
+    if (feeling >= 5) return `Stress is at ${feeling}/10 — moderate, but worth watching the signals.`;
+    return `Stress is low at ${feeling}/10 — the team is in a good place this cycle.`;
   })();
 
   const cycleAddendum = [
-    topTeam && `${topTeam[0]} leads morale at ${topTeam[1]}/10.`,
-    lowTeam && lowTeam[1] < 6 && `${lowTeam[0]} is at ${lowTeam[1]}/10 and could use a check-in.`,
-    topStressor && `Workload is the loudest signal we're hearing back.`,
+    mostStressedTeam && mostStressedTeam[1] >= 6.5 && `${mostStressedTeam[0]} is showing the highest stress at ${mostStressedTeam[1]}/10 — worth a check-in.`,
+    leastStressedTeam && leastStressedTeam[1] < 4.5 && `${leastStressedTeam[0]} is the steadiest at ${leastStressedTeam[1]}/10.`,
+    topStressor && `Top stressor this cycle: ${topStressor.label.toLowerCase()}.`,
   ].filter(Boolean).slice(0, 1).join(" ");
 
   return (
