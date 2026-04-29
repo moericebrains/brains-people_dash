@@ -365,6 +365,24 @@ export default function TeamDNAView({ onSelectPerson, people = PEOPLE }: TeamDNA
         ))}
       </div>
 
+      {/* Summary card — strengths, enneagram, mbti only (not workstyle) */}
+      {frameworkSummary && framework !== "workstyle" && (
+        <div style={{ background: "#FFFFFF", padding: "18px 22px", marginBottom: 8, boxShadow: "var(--shadow-md)", borderRadius: 4 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 16, alignItems: "flex-start" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/sparks/spark-fill-hero.svg" alt="" style={{ width: 40, height: 36, flexShrink: 0, marginTop: 2 }} />
+            <div>
+              <div className="d-eyebrow d-eyebrow--muted" style={{ marginBottom: 5 }}>
+                {podLabel ? `${podLabel} · ` : "Full org · "}{framework === "strengths" ? "StrengthsFinder" : framework === "enneagram" ? "Enneagram" : "Myers-Briggs"} — so what
+              </div>
+              <p style={{ fontFamily: "var(--font-display)", fontWeight: 300, fontSize: 18, lineHeight: 1.3, margin: 0, letterSpacing: ".01em", color: "#131313" }}>
+                {frameworkSummary}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Pod playbook */}
       {podLabel && (
         <div style={{ marginBottom: 8 }}>
